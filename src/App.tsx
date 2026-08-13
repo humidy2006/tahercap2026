@@ -24,7 +24,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('shop');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Products Database State with LocalStorage Persistence
+  // Products Database State with LocalStorage Persistence & Server Sync
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('altaher_products');
     if (saved) {
@@ -40,14 +40,51 @@ export default function App() {
     return INITIAL_PRODUCTS;
   });
 
-  // Save products to LocalStorage on state change
+  // Fetch products from server on initial load
   useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+          setProducts(data.products);
+          localStorage.setItem('altaher_products', JSON.stringify(data.products));
+        }
+      })
+      .catch(e => console.log('Using cached local products:', e));
+  }, []);
+
+  // Sync products across browser tabs
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'altaher_products' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setProducts(parsed);
+          }
+        } catch (err) {
+          console.error('Failed to parse updated products from storage event:', err);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Save products to LocalStorage & Express backend server
+  const saveAndSyncProducts = (newProducts: Product[]) => {
+    setProducts(newProducts);
     try {
-      localStorage.setItem('altaher_products', JSON.stringify(products));
+      localStorage.setItem('altaher_products', JSON.stringify(newProducts));
     } catch (e) {
       console.error('Failed to save products to localStorage:', e);
     }
-  }, [products]);
+    fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: newProducts })
+    }).catch(e => console.error('Failed to sync products with backend:', e));
+  };
 
   // User Authentication State with LocalStorage Persistence
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -193,15 +230,42 @@ export default function App() {
 
   // Admin Actions
   const handleAddProduct = (newProduct: Product) => {
-    setProducts(prev => [newProduct, ...prev]);
+    const updated = [newProduct, ...products];
+    saveAndSyncProducts(updated);
   };
 
   const handleUpdateProduct = (updatedProduct: Product) => {
-    setProducts(prev => prev.map(p => (p.id === updatedProduct.id ? updatedProduct : p)));
+    const updated = products.map(p => (p.id === updatedProduct.id ? updatedProduct : p));
+    saveAndSyncProducts(updated);
+
+    // Update quick view modal if actively open
+    if (quickViewProduct && quickViewProduct.id === updatedProduct.id) {
+      setQuickViewProduct(updatedProduct);
+    }
+
+    // Update cart item product details if present in cart
+    setCartItems(prev =>
+      prev.map(item =>
+        item.product.id === updatedProduct.id
+          ? { ...item, product: updatedProduct }
+          : item
+      )
+    );
   };
 
   const handleDeleteProduct = (productId: string) => {
-    setProducts(prev => prev.filter(p => p.id !== productId));
+    const updated = products.filter(p => p.id !== productId);
+    saveAndSyncProducts(updated);
+
+    if (quickViewProduct && quickViewProduct.id === productId) {
+      setQuickViewProduct(null);
+    }
+
+    setCartItems(prev => prev.filter(item => item.product.id !== productId));
+  };
+
+  const handleResetProducts = () => {
+    saveAndSyncProducts(INITIAL_PRODUCTS);
   };
 
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -364,7 +428,7 @@ export default function App() {
         onAddProduct={handleAddProduct}
         onUpdateProduct={handleUpdateProduct}
         onDeleteProduct={handleDeleteProduct}
-        onResetProducts={() => setProducts(INITIAL_PRODUCTS)}
+        onResetProducts={handleResetProducts}
         language={language}
         currency={currency}
       />

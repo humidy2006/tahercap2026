@@ -3,7 +3,6 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
-
 dotenv.config();
 
 const app = express();
@@ -15,6 +14,22 @@ app.use(express.json());
 const inquiriesDatabase: any[] = [];
 const ordersDatabase: any[] = [];
 const customDesignsDatabase: any[] = [];
+let productsDatabase: any[] = [];
+
+// API Route: Get Products
+app.get('/api/products', (req, res) => {
+  return res.json({ products: productsDatabase });
+});
+
+// API Route: Update / Save Products (Admin Sync)
+app.post('/api/products', (req, res) => {
+  const { products } = req.body;
+  if (Array.isArray(products) && products.length > 0) {
+    productsDatabase = products;
+    return res.json({ success: true, products: productsDatabase, message: 'Products database synchronized successfully.' });
+  }
+  return res.status(400).json({ error: 'Invalid products data provided.' });
+});
 
 // API Route: Gemini AI Tupi Consultant
 app.post('/api/ai-consultant', async (req, res) => {

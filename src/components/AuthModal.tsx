@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
-import { User as UserIcon, Mail, Phone, Lock, ShieldCheck, LogOut, CheckCircle, AlertCircle, X, KeyRound, Sparkles } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, Lock, ShieldCheck, LogOut, CheckCircle, AlertCircle, X, KeyRound, Sparkles, UserPlus, LogIn } from 'lucide-react';
 import { User, Language } from '../types';
+
+interface RegisteredAccount {
+  id: string;
+  name: string;
+  emailOrPhone: string;
+  password: string;
+  role: 'admin' | 'customer';
+  loginMethod: 'email' | 'phone';
+  createdAt: string;
+}
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -11,6 +21,49 @@ interface AuthModalProps {
   language: Language;
   initialMode?: 'login' | 'signup' | 'admin';
 }
+
+const ADMIN_EMAIL = 'abdullahhumidy@gmail.com';
+
+const getStoredAccounts = (): RegisteredAccount[] => {
+  try {
+    const data = localStorage.getItem('altaher_registered_accounts');
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load accounts:', e);
+  }
+
+  // Default initial accounts if empty
+  const defaultAccounts: RegisteredAccount[] = [
+    {
+      id: 'admin_default',
+      name: 'Abdullah (Admin)',
+      emailOrPhone: ADMIN_EMAIL,
+      password: 'admin',
+      role: 'admin',
+      loginMethod: 'email',
+      createdAt: new Date().toISOString()
+    }
+  ];
+  try {
+    localStorage.setItem('altaher_registered_accounts', JSON.stringify(defaultAccounts));
+  } catch (e) {
+    console.error('Failed to save default account:', e);
+  }
+  return defaultAccounts;
+};
+
+const saveAccounts = (accounts: RegisteredAccount[]) => {
+  try {
+    localStorage.setItem('altaher_registered_accounts', JSON.stringify(accounts));
+  } catch (e) {
+    console.error('Failed to save accounts:', e);
+  }
+};
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
@@ -24,12 +77,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const isBn = language === 'bn';
 
   const [activeTab, setActiveTab] = useState<'customer' | 'admin'>(initialMode === 'admin' ? 'admin' : 'customer');
-  const [isRegistering, setIsRegistering] = useState(initialMode === 'signup');
+  const [isRegistering, setIsRegistering] = useState<boolean>(initialMode === 'signup');
   
   // Form fields
   const [name, setName] = useState('');
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,46 +91,122 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const ADMIN_EMAIL = 'abdullahhumidy@gmail.com';
-
   const handleCustomerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const input = emailOrPhone.trim();
+    const rawInput = emailOrPhone.trim();
+    const input = rawInput.toLowerCase();
+
     if (!input) {
       setErrorMessage(isBn ? 'দয়া করে আপনার ইমেইল বা মোবাইল নম্বর দিন' : 'Please enter your email or phone number');
       return;
     }
 
     if (password.length < 4) {
-      setErrorMessage(isBn ? 'পাসওয়ার্ড অথবা পিন কমপক্ষে ৪ অক্ষরের হতে হবে' : 'Password or PIN must be at least 4 characters');
+      setErrorMessage(isBn ? 'পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে' : 'Password must be at least 4 characters');
       return;
     }
 
-    // Check if user is trying to log in as admin from customer tab
-    const isAdminEmail = input.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const accounts = getStoredAccounts();
+    const isAdminEmail = input === ADMIN_EMAIL.toLowerCase();
 
-    const loggedUser: User = {
-      id: 'usr_' + Date.now(),
-      name: name.trim() || (input.includes('@') ? input.split('@')[0] : 'Customer'),
-      emailOrPhone: input,
-      role: isAdminEmail ? 'admin' : 'customer',
-      loginMethod: input.includes('@') ? 'email' : 'phone'
-    };
+    // MODE 1: SIGN UP (REGISTRATION)
+    if (isRegistering) {
+      if (password !== confirmPassword) {
+        setErrorMessage(isBn ? 'পাসওয়ার্ড দুটি মিলছে না! পুনরায় টাইপ করুন।' : 'Passwords do not match! Please verify.');
+        return;
+      }
 
-    onLogin(loggedUser);
-    setSuccessMessage(
-      isAdminEmail
-        ? (isBn ? 'অ্যাডমিন হিসেবে সফলভাবে লগইন হয়েছেন!' : 'Logged in as Admin successfully!')
-        : (isBn ? 'সফলভাবে লগইন হয়েছে!' : 'Logged in successfully!')
-    );
+      // Check if account already exists
+      const existingAccount = accounts.find(a => a.emailOrPhone.toLowerCase() === input);
+      if (existingAccount) {
+        setErrorMessage(
+          isBn 
+            ? `এই আইডি (${rawInput}) দিয়ে ইতিমধ্যে অ্যাকাউন্ট তৈরি করা আছে! দয়া করে লগইন করুন।`
+            : `An account with (${rawInput}) already exists! Please Sign In.`
+        );
+        return;
+      }
 
-    setTimeout(() => {
-      setSuccessMessage(null);
-      onClose();
-    }, 1200);
+      // Create new account
+      const newAccount: RegisteredAccount = {
+        id: 'usr_' + Date.now(),
+        name: name.trim() || (input.includes('@') ? input.split('@')[0] : 'Customer'),
+        emailOrPhone: rawInput,
+        password: password,
+        role: isAdminEmail ? 'admin' : 'customer',
+        loginMethod: input.includes('@') ? 'email' : 'phone',
+        createdAt: new Date().toISOString()
+      };
+
+      const updatedAccounts = [...accounts, newAccount];
+      saveAccounts(updatedAccounts);
+
+      const loggedUser: User = {
+        id: newAccount.id,
+        name: newAccount.name,
+        emailOrPhone: newAccount.emailOrPhone,
+        role: newAccount.role,
+        loginMethod: newAccount.loginMethod
+      };
+
+      onLogin(loggedUser);
+      setSuccessMessage(
+        isBn 
+          ? 'নতুন অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে এবং লগইন সম্পূর্ণ হয়েছে!' 
+          : 'Account created successfully & logged in!'
+      );
+
+      setTimeout(() => {
+        setSuccessMessage(null);
+        onClose();
+      }, 1200);
+
+    } else {
+      // MODE 2: LOG IN (VERIFICATION)
+      const existingAccount = accounts.find(a => a.emailOrPhone.toLowerCase() === input);
+
+      if (!existingAccount) {
+        setErrorMessage(
+          isBn
+            ? `(${rawInput}) আইডি দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি! দয়া করে আগে 'সাইনআপ' (নতুন অ্যাকাউন্ট তৈরি) করুন।`
+            : `No account found with (${rawInput})! Please Sign Up first.`
+        );
+        return;
+      }
+
+      if (existingAccount.password !== password) {
+        setErrorMessage(
+          isBn 
+            ? 'ভুল পাসওয়ার্ড! দয়া করে আপনার সঠিক সাইনআপ পাসওয়ার্ড দিয়ে চেষ্টা করুন।' 
+            : 'Incorrect password! Please check your signup password.'
+        );
+        return;
+      }
+
+      // Login successful
+      const loggedUser: User = {
+        id: existingAccount.id,
+        name: existingAccount.name,
+        emailOrPhone: existingAccount.emailOrPhone,
+        role: existingAccount.role,
+        loginMethod: existingAccount.loginMethod
+      };
+
+      onLogin(loggedUser);
+      setSuccessMessage(
+        existingAccount.role === 'admin'
+          ? (isBn ? 'অ্যাডমিন হিসেবে সফলভাবে লগইন হয়েছেন!' : 'Logged in as Admin successfully!')
+          : (isBn ? 'সফলভাবে লগইন হয়েছে!' : 'Logged in successfully!')
+      );
+
+      setTimeout(() => {
+        setSuccessMessage(null);
+        onClose();
+      }, 1200);
+    }
   };
 
   const handleAdminSubmit = (e: React.FormEvent) => {
@@ -95,14 +225,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    if (!adminPassword || adminPassword.length < 4) {
-      setErrorMessage(isBn ? 'সঠিক এডমিন পাসওয়ার্ড প্রদান করুন' : 'Please enter valid admin password');
+    const accounts = getStoredAccounts();
+    const adminAccount = accounts.find(a => a.emailOrPhone.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+
+    const expectedPassword = adminAccount ? adminAccount.password : 'admin';
+
+    if (adminPassword !== expectedPassword) {
+      setErrorMessage(isBn ? 'ভুল এডমিন সিকিউরিটি পাসওয়ার্ড!' : 'Incorrect Admin Security Password!');
       return;
     }
 
     const adminUser: User = {
-      id: 'admin_' + Date.now(),
-      name: 'Abdullah (Admin)',
+      id: adminAccount ? adminAccount.id : 'admin_' + Date.now(),
+      name: adminAccount ? adminAccount.name : 'Abdullah (Admin)',
       emailOrPhone: ADMIN_EMAIL,
       role: 'admin',
       loginMethod: 'email'
@@ -129,12 +264,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold font-serif text-amber-200 text-base">
-                {currentUser ? (isBn ? 'মাই একাউন্ট প্রোফাইল' : 'My Account Profile') : (isBn ? 'লগইন এবং একাউন্ট' : 'User Account & Portal')}
+                {currentUser 
+                  ? (isBn ? 'মাই একাউন্ট প্রোফাইল' : 'My Account Profile') 
+                  : isRegistering 
+                    ? (isBn ? 'নতুন অ্যাকাউন্ট সাইনআপ' : 'Create New Account')
+                    : (isBn ? 'গ্রাহক অ্যাকাউন্ট লগইন' : 'User Account Sign In')}
               </h3>
               <p className="text-[11px] text-slate-400">
                 {currentUser
                   ? (currentUser.role === 'admin' ? (isBn ? 'অ্যাডমিন স্ট্যাটাস সক্রিয়' : 'System Administrator') : (isBn ? 'গ্রাহক অ্যাকাউন্ট' : 'Verified Customer'))
-                  : (isBn ? 'গ্রাহক বা অ্যাডমিন অ্যাকাউন্টে প্রবেশ করুন' : 'Sign in as Customer or System Admin')}
+                  : isRegistering
+                    ? (isBn ? 'আপনার সঠিক আইডি ও পাসওয়ার্ড দিয়ে রেজিস্ট্রেশন করুন' : 'Register with your unique ID and password')
+                    : (isBn ? 'সাইনআপে ব্যবহৃত সঠিক আইডি ও পাসওয়ার্ড দিন' : 'Enter your registered ID and password')}
               </p>
             </div>
           </div>
@@ -217,7 +358,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }`}
               >
                 <UserIcon className="w-3.5 h-3.5 text-amber-600" />
-                <span>{isBn ? 'গ্রাহক প্রবেশ (Customer)' : 'Customer Sign In'}</span>
+                <span>{isBn ? 'গ্রাহক অ্যাকাউন্ট' : 'Customer Portal'}</span>
               </button>
 
               <button
@@ -232,21 +373,58 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }`}
               >
                 <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                <span>{isBn ? 'অ্যাডমিন লগইন' : 'Admin Login'}</span>
+                <span>{isBn ? 'অ্যাডমিন প্রবেশ' : 'Admin Login'}</span>
               </button>
             </div>
 
+            {/* Customer Sub-Mode Switcher: Sign In vs Sign Up */}
+            {activeTab === 'customer' && (
+              <div className="flex border-b border-slate-200 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegistering(false);
+                    setErrorMessage(null);
+                  }}
+                  className={`flex-1 py-2 text-center border-b-2 transition flex items-center justify-center gap-1.5 ${
+                    !isRegistering 
+                      ? 'border-slate-950 text-slate-950 bg-slate-50' 
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{isBn ? '১. অ্যাকাউন্টে লগইন' : '1. Sign In'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegistering(true);
+                    setErrorMessage(null);
+                  }}
+                  className={`flex-1 py-2 text-center border-b-2 transition flex items-center justify-center gap-1.5 ${
+                    isRegistering 
+                      ? 'border-slate-950 text-slate-950 bg-amber-50/60' 
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{isBn ? '২. নতুন সাইনআপ (Register)' : '2. Sign Up'}</span>
+                </button>
+              </div>
+            )}
+
             {/* Error Message */}
             {errorMessage && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3 rounded-xl flex items-start gap-2">
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3 rounded-xl flex items-start gap-2 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
-                <span>{errorMessage}</span>
+                <span className="leading-relaxed font-medium">{errorMessage}</span>
               </div>
             )}
 
             {/* Success Message */}
             {successMessage && (
-              <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs p-3 rounded-xl flex items-center gap-2 font-bold">
+              <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs p-3 rounded-xl flex items-center gap-2 font-bold animate-in fade-in">
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
                 <span>{successMessage}</span>
               </div>
@@ -255,36 +433,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* TAB 1: CUSTOMER LOGIN / SIGNUP */}
             {activeTab === 'customer' && (
               <form onSubmit={handleCustomerSubmit} className="space-y-3.5 text-xs">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="font-bold text-slate-700">
-                      {isBn ? 'ইমেইল অথবা মোবাইল নম্বর' : 'Email Address or Mobile Number'} *
-                    </label>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      value={emailOrPhone}
-                      onChange={(e) => setEmailOrPhone(e.target.value)}
-                      placeholder={isBn ? 'যেমন: 01700000000 অথবা user@gmail.com' : 'e.g. 01700000000 or customer@gmail.com'}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 font-medium text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none"
-                    />
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  </div>
-                </div>
-
+                
                 {isRegistering && (
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">
-                      {isBn ? 'আপনার পূর্ণ নাম' : 'Your Full Name'}
+                      {isBn ? 'আপনার পূর্ণ নাম' : 'Your Full Name'} *
                     </label>
                     <div className="relative">
                       <input
                         type="text"
+                        required
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Al-Amin Hossain"
+                        placeholder={isBn ? 'যেমন: মোহাম্মদ আল-আমিন' : 'e.g. Mohammad Al-Amin'}
                         className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 font-medium text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none"
                       />
                       <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -294,7 +455,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    {isBn ? 'পাসওয়ার্ড বা পিন কোড' : 'Password or PIN Code'} *
+                    {isBn ? 'মোবাইল নম্বর অথবা ইমেইল আইডি' : 'Mobile Number or Email ID'} *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={emailOrPhone}
+                      onChange={(e) => setEmailOrPhone(e.target.value)}
+                      placeholder={isBn ? 'যেমন: 01711000000 অথবা user@gmail.com' : 'e.g. 01711000000 or customer@gmail.com'}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 font-medium text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none"
+                    />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    {isRegistering
+                      ? (isBn ? 'নতুন পাসওয়ার্ড সেট করুন' : 'Set New Password')
+                      : (isBn ? 'পাসওয়ার্ড কোড' : 'Password')} *
                   </label>
                   <div className="relative">
                     <input
@@ -309,27 +489,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
                 </div>
 
+                {isRegistering && (
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isBn ? 'পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm Password'} *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 font-medium text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none"
+                      />
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full bg-slate-950 hover:bg-black text-amber-300 font-bold py-3 rounded-xl transition shadow-md flex items-center justify-center gap-2"
+                  className="w-full bg-slate-950 hover:bg-black text-amber-300 font-bold py-3 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-xs"
                 >
                   <CheckCircle className="w-4 h-4" />
                   <span>
                     {isRegistering
-                      ? (isBn ? 'নতুন অ্যাকাউন্ট খুলুন' : 'Create Customer Account')
+                      ? (isBn ? 'অ্যাকাউন্ট তৈরি নিশ্চিত করুন' : 'Register Account')
                       : (isBn ? 'লগইন করুন' : 'Sign In')}
                   </span>
                 </button>
 
-                <div className="text-center pt-1">
+                <div className="text-center pt-1 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsRegistering(!isRegistering)}
-                    className="text-xs text-slate-600 hover:text-slate-950 font-semibold underline"
+                    onClick={() => {
+                      setIsRegistering(!isRegistering);
+                      setErrorMessage(null);
+                    }}
+                    className="text-xs text-slate-600 hover:text-slate-950 font-bold underline"
                   >
                     {isRegistering
-                      ? (isBn ? 'ইতিমধ্যে অ্যাকাউন্ট আছে? লগইন করুন' : 'Already have an account? Sign In')
-                      : (isBn ? 'নতুন অ্যাকাউন্ট তৈরি করতে চান? সাইনআপ করুন' : 'New here? Create an Account')}
+                      ? (isBn ? 'ইতিমধ্যে অ্যাকাউন্ট আছে? লগইন করুন' : 'Already registered? Sign In here')
+                      : (isBn ? 'নতুন ব্যবহারকারী? এখানে অ্যাকাউন্ট সাইনআপ করুন' : 'New user? Sign Up here')}
                   </button>
                 </div>
               </form>

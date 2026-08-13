@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as ImageIcon, Save, Check } from 'lucide-react';
+import { Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as ImageIcon, Save, Check, Upload, FolderOpen } from 'lucide-react';
 import { Product, WholesaleInquiry, Order, Language, Currency } from '../types';
 import { formatPrice } from '../utils/currency';
 import { IMAGES } from '../data/images';
@@ -42,6 +42,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Handle File Upload from Computer for New Product
+  const handleFileUploadForNew = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert(isBn ? 'দয়া করে একটি ছবি/ইমেজ ফাইল সিলেক্ট করুন।' : 'Please select a valid image file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setNewImage(event.target.result as string);
+        showToast(isBn ? 'কম্পিউটার ফোল্ডার থেকে ছবি লোড হয়েছে!' : 'Photo loaded from computer folder!');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle File Upload from Computer for Editing Product
+  const handleFileUploadForEdit = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingProduct) return;
+    if (!file.type.startsWith('image/')) {
+      alert(isBn ? 'দয়া করে একটি ছবি/ইমেজ ফাইল সিলেক্ট করুন।' : 'Please select a valid image file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setEditingProduct({
+          ...editingProduct,
+          image: event.target.result as string
+        });
+        showToast(isBn ? 'কম্পিউটার থেকে ছবি আপডেট হয়েছে!' : 'Photo updated from computer!');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // Inline Quick Price Editing State
@@ -372,29 +411,66 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       />
                     </div>
 
-                    <div className="md:col-span-2 space-y-1">
-                      <label className="block font-bold text-slate-700">Cap Image Presets / Custom Image URL</label>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {sampleImages.map((s, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setNewImage(s.url)}
-                            className={`px-2.5 py-1 rounded text-[11px] font-bold border transition ${
-                              newImage === s.url ? 'bg-slate-950 text-amber-300 border-slate-900' : 'bg-slate-100 border-slate-200 text-slate-700'
-                            }`}
-                          >
-                            {s.label}
-                          </button>
-                        ))}
+                    <div className="md:col-span-2 space-y-2 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
+                      <label className="block font-bold text-slate-900 text-xs flex items-center justify-between">
+                        <span>{isBn ? 'টুপির ছবি আপলোড করুন (কম্পিউটার বা প্রিসেট থেকে)' : 'Product Photo (Computer Folder / Presets)'}</span>
+                        {newImage && <span className="text-[10px] text-emerald-700 font-bold">✓ {isBn ? 'ছবি রেডি' : 'Image Selected'}</span>}
+                      </label>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        {/* Preview Box */}
+                        <div className="w-20 h-20 bg-white border-2 border-dashed border-slate-300 rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-xs relative">
+                          {newImage ? (
+                            <img src={newImage} alt="Preview" className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon className="w-8 h-8 text-slate-400" />
+                          )}
+                        </div>
+
+                        <div className="flex-1 space-y-2 w-full">
+                          {/* File Input Button */}
+                          <div className="flex items-center gap-2">
+                            <label className="cursor-pointer bg-slate-950 hover:bg-black text-amber-300 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xs transition border border-amber-400/30">
+                              <Upload className="w-4 h-4 text-amber-400" />
+                              <span>{isBn ? 'কম্পিউটারের ফোল্ডার থেকে ছবি বেছে নিন' : 'Upload Photo from Computer Folder'}</span>
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                onChange={handleFileUploadForNew}
+                                className="hidden" 
+                              />
+                            </label>
+                          </div>
+
+                          {/* Presets and URL Fallback */}
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-slate-500 font-medium">
+                              {isBn ? 'অথবা ওয়েবসাইট প্রিসেট থেকে ছবি বা অনলাইন লিংক দিন:' : 'Or pick from preset cap photos:'}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 mb-1">
+                              {sampleImages.map((s, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setNewImage(s.url)}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
+                                    newImage === s.url ? 'bg-slate-950 text-amber-300 border-slate-900' : 'bg-white border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {s.label}
+                                </button>
+                              ))}
+                            </div>
+                            <input
+                              type="text"
+                              value={newImage}
+                              onChange={(e) => setNewImage(e.target.value)}
+                              placeholder="Online image URL (Optional)..."
+                              className="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-mono text-[10px]"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <input
-                        type="text"
-                        value={newImage}
-                        onChange={(e) => setNewImage(e.target.value)}
-                        placeholder="Paste image URL..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono text-[11px]"
-                      />
                     </div>
                   </div>
 
@@ -475,14 +551,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2"
                       />
                     </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Image URL</label>
-                      <input
-                        type="text"
-                        value={editingProduct.image}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono text-[10px]"
-                      />
+                    <div className="md:col-span-2 space-y-2 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
+                      <label className="block font-bold text-slate-900 text-xs flex items-center justify-between">
+                        <span>{isBn ? 'টুপির ছবি আপডেট করুন (কম্পিউটার বা ডিভাইস থেকে)' : 'Update Product Photo (Upload from Computer)'}</span>
+                      </label>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <div className="w-20 h-20 bg-white border border-slate-300 rounded-xl overflow-hidden shrink-0 shadow-xs">
+                          <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+
+                        <div className="flex-1 space-y-2 w-full">
+                          <label className="cursor-pointer bg-slate-950 hover:bg-black text-amber-300 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xs transition border border-amber-400/30 w-fit">
+                            <Upload className="w-4 h-4 text-amber-400" />
+                            <span>{isBn ? 'কম্পিউটার ফোল্ডার থেকে নতুন ছবি বেছে নিন' : 'Browse New Photo from Computer Folder'}</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={handleFileUploadForEdit}
+                              className="hidden" 
+                            />
+                          </label>
+
+                          <div>
+                            <label className="block text-[10px] text-slate-500 font-medium">Image URL / Data Path</label>
+                            <input
+                              type="text"
+                              value={editingProduct.image}
+                              onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                              className="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-mono text-[10px]"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
