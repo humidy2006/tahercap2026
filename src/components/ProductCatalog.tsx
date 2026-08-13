@@ -53,6 +53,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
       !searchQuery ||
       product.title.toLowerCase().includes(queryLower) ||
       product.titleBn.includes(searchQuery) ||
+      (product.designNumber && product.designNumber.toLowerCase().includes(queryLower)) ||
       product.fabric.toLowerCase().includes(queryLower) ||
       product.category.toLowerCase().includes(queryLower) ||
       product.tags.some(t => t.toLowerCase().includes(queryLower));

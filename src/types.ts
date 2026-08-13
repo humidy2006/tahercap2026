@@ -7,13 +7,15 @@ export interface Product {
   titleBn: string;
   category: string;
   categoryBn: string;
+  designNumber: string; // e.g. "DES-48" or "48"
   price: number; // in BDT
   originalPrice?: number;
+  stock: number; // available quantity
+  sizes: string[]; // size array in cm (e.g. ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm'])
   fabric: string;
   fabricBn: string;
   crownHeight: 'Short (2.5")' | 'Medium (3.2")' | 'Tall/Hard (3.8")';
   crownHeightBn: string;
-  sizes: string[];
   availableColors: { name: string; hex: string }[];
   rating: number;
   reviewsCount: number;
@@ -22,7 +24,6 @@ export interface Product {
   image: string;
   description: string;
   descriptionBn: string;
-  stock: number;
   tags: string[];
 }
 

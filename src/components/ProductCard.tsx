@@ -22,7 +22,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const isBn = language === 'bn';
 
-  const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] || '22.0"');
+  const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] || '48 cm');
   const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string }>(
     product.availableColors[0] || { name: 'White', hex: '#FFFFFF' }
   );
@@ -64,6 +64,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </span>
           )}
         </div>
+
+        {/* Design Number Badge on Top Right */}
+        {product.designNumber && (
+          <div className="absolute top-3 right-3 z-10">
+            <span className="bg-slate-950/80 backdrop-blur-xs text-amber-300 font-mono font-bold text-[10px] px-2 py-0.5 rounded-md border border-amber-400/30 shadow-xs">
+              {product.designNumber}
+            </span>
+          </div>
+        )}
 
         {/* Quick View Floating Button */}
         <div className="absolute bottom-3 inset-x-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-2">

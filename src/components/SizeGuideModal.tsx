@@ -14,13 +14,15 @@ export const SizeGuideModal: React.FC<SizeGuideModalProps> = ({ isOpen, onClose,
   const isBn = language === 'bn';
 
   const sizeTable = [
-    { size: '21.0 Inches', cm: '53.3 cm', label: 'Small (S) / Young Boy', labelBn: 'স্মল / উঠতি বয়সী' },
-    { size: '21.5 Inches', cm: '54.6 cm', label: 'Medium (M) - Standard', labelBn: 'মিডিয়াম - সাধারণ' },
-    { size: '22.0 Inches', cm: '55.8 cm', label: 'Medium Plus (M+)', labelBn: 'মিডিয়াম প্লাস (সর্বাধিক বিক্রীত)' },
-    { size: '22.5 Inches', cm: '57.1 cm', label: 'Large (L) - Popular', labelBn: 'লার্জ - সাধারণ প্রাপ্তবয়স্ক' },
-    { size: '23.0 Inches', cm: '58.4 cm', label: 'Extra Large (XL)', labelBn: 'এক্সট্রা লার্জ' },
-    { size: '23.5 Inches', cm: '59.7 cm', label: 'Double XL (XXL)', labelBn: 'ডাবল এক্সএল' },
-    { size: '24.0 Inches', cm: '61.0 cm', label: 'Triple XL (3XL) Custom', labelBn: 'ট্রিপল এক্সএল কাস্টম' }
+    { size: '44 cm', code: 'Size 44', inches: '17.3"', label: 'Kids (2-5 Yrs)', labelBn: 'শিশু (২-৫ বছর)' },
+    { size: '46 cm', code: 'Size 46', inches: '18.1"', label: 'Kids (6-10 Yrs)', labelBn: 'শিশু (৬-১০ বছর)' },
+    { size: '48 cm', code: 'Size 48', inches: '18.9"', label: 'Small (S) / Young Boy', labelBn: 'সাইজ ৪৮ (উঠতি বয়সি / স্মল)' },
+    { size: '50 cm', code: 'Size 50', inches: '19.7"', label: 'Medium (M)', labelBn: 'সাইজ ৫০ (মিডিয়াম)' },
+    { size: '52 cm', code: 'Size 52', inches: '20.5"', label: 'Standard (M+)', labelBn: 'সাইজ ৫২ (মিডিয়াম প্লাস - জনপ্রিয়)' },
+    { size: '54 cm', code: 'Size 54', inches: '21.3"', label: 'Large (L)', labelBn: 'সাইজ ৫৪ (লার্জ)' },
+    { size: '56 cm', code: 'Size 56', inches: '22.0"', label: 'Extra Large (XL)', labelBn: 'সাইজ ৫৬ (এক্সট্রা লার্জ)' },
+    { size: '58 cm', code: 'Size 58', inches: '22.8"', label: 'Double XL (2XL)', labelBn: 'সাইজ ৫৮ (ডাবল এক্সএল)' },
+    { size: '60 cm', code: 'Size 60', inches: '23.6"', label: 'Triple XL (3XL)', labelBn: 'সাইজ ৬০ (ট্রিপল এক্সএল)' }
   ];
 
   return (
@@ -47,12 +49,12 @@ export const SizeGuideModal: React.FC<SizeGuideModalProps> = ({ isOpen, onClose,
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-2 text-xs">
           <p className="font-bold text-amber-900 flex items-center gap-1.5">
             <HelpCircle className="w-4 h-4 text-amber-600" />
-            <span>{isBn ? 'কিভাবে মাথার মাপ নিবেন?' : 'How to measure your head correctly?'}</span>
+            <span>{isBn ? 'সেমি (CM) অনুযায়ী টুপি সাইজ চেনার সহজ উপায়' : 'How CM sizing works for caps?'}</span>
           </p>
           <p className="text-amber-900/80 leading-relaxed">
             {isBn
-              ? 'একটি ফিতা (Measuring Tape) দিয়ে কপালের ঠিক ১ ইঞ্চি উপরে ও কানের উপর দিয়ে মাথার চারপাশে ঘুরিয়ে ইঞ্চিতে মেপে নিন। আপনার মাথার মাপ যদি ২২.২ ইঞ্চি হয়, তবে ২২.৫ ইঞ্চি সাইজ বেছে নেওয়া সবচেয়ে আরামদায়ক হবে।'
-              : 'Wrap a soft measuring tape around your head, positioning it about 1 inch above your eyebrows and ears. If your head measures 22.2 inches, choose size 22.5" for the most comfortable fit.'}
+              ? 'আল তাহের গার্মেন্টসে সেন্টিমিটার (cm) হিসেবে টুপির সাইজ নির্ধারিত হয়। যেমন: ৪৮ সেমি (48 cm) মাপ মানে সাইজ ৪৮। একটি ফিতা দিয়ে কপালের ওপর মাথার পরিধি সেমিতে মেপে সঠিক সাইজ অর্ডার করুন।'
+              : 'At Al Taher Garments, sizes are measured in centimeters (cm). For instance, a 48 cm head circumference corresponds to Size 48. Measure your head circumference in cm using a soft tape.'}
           </p>
         </div>
 
@@ -61,16 +63,20 @@ export const SizeGuideModal: React.FC<SizeGuideModalProps> = ({ isOpen, onClose,
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-950 text-amber-300 font-bold uppercase">
               <tr>
-                <th className="p-3">{isBn ? 'সাইজ (ইঞ্চি)' : 'Size (Inches)'}</th>
-                <th className="p-3">{isBn ? 'সেন্টিমিটার' : 'Centimeters'}</th>
+                <th className="p-3">{isBn ? 'সাইজ (cm / সেমি)' : 'Size (cm)'}</th>
+                <th className="p-3">{isBn ? 'ইঞ্চি সমমান' : 'Inches Equivalent'}</th>
                 <th className="p-3">{isBn ? 'ফিটিং ক্যাটাগরি' : 'Fit Category'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {sizeTable.map((st, idx) => (
                 <tr key={idx} className="hover:bg-slate-50">
-                  <td className="p-3 font-bold text-slate-950 font-mono">{st.size}</td>
-                  <td className="p-3 text-slate-600">{st.cm}</td>
+                  <td className="p-3 font-bold text-slate-950 font-mono">
+                    <span className="bg-amber-100 text-amber-950 px-2 py-0.5 rounded border border-amber-300">
+                      {st.size} ({st.code})
+                    </span>
+                  </td>
+                  <td className="p-3 text-slate-600">{st.inches}</td>
                   <td className="p-3 text-slate-800">{isBn ? st.labelBn : st.label}</td>
                 </tr>
               ))}

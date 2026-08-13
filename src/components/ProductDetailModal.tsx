@@ -28,7 +28,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const isBn = language === 'bn';
 
-  const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] || '22.0"');
+  const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] || '48 cm');
   const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string }>(
     product.availableColors[0] || { name: 'White', hex: '#FFFFFF' }
   );
@@ -69,8 +69,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               />
             </div>
 
-            <div className="absolute top-8 left-8 bg-slate-950 text-amber-300 font-extrabold text-xs px-3 py-1 rounded-full shadow-md">
-              {isBn ? product.categoryBn : product.category}
+            <div className="flex items-center gap-2 absolute top-8 left-8">
+              <span className="bg-slate-950 text-amber-300 font-extrabold text-xs px-3 py-1 rounded-full shadow-md">
+                {isBn ? product.categoryBn : product.category}
+              </span>
+              {product.designNumber && (
+                <span className="bg-amber-500 text-slate-950 font-mono font-extrabold text-xs px-2.5 py-1 rounded-full shadow-md">
+                  {product.designNumber}
+                </span>
+              )}
             </div>
           </div>
 
