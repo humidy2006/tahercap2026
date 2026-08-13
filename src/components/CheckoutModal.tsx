@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, CheckCircle2, CreditCard, Banknote, Smartphone, Truck, FileText } from 'lucide-react';
-import { CartItem, Language, Currency, Order } from '../types';
+import { CartItem, Language, Currency, Order, User } from '../types';
 import { formatPrice } from '../utils/currency';
 
 interface CheckoutModalProps {
@@ -10,6 +10,7 @@ interface CheckoutModalProps {
   language: Language;
   currency: Currency;
   onOrderCompleted: (order: Order) => void;
+  currentUser?: User | null;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -18,7 +19,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   cartItems,
   language,
   currency,
-  onOrderCompleted
+  onOrderCompleted,
+  currentUser
 }) => {
   if (!isOpen) return null;
 
@@ -32,6 +34,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [district, setDistrict] = useState('Dhaka');
   const [paymentMethod, setPaymentMethod] = useState<Order['paymentMethod']>('Cash on Delivery (COD)');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.name && currentUser.name !== 'Customer') {
+        setCustomerName(currentUser.name);
+      }
+      if (currentUser.emailOrPhone.includes('@')) {
+        setEmail(currentUser.emailOrPhone);
+      } else {
+        setPhone(currentUser.emailOrPhone);
+      }
+    }
+  }, [currentUser]);
 
   const subtotal = cartItems.reduce((sum, item) => {
     const itemUnitPrice = item.isCustomItem && item.customDetails

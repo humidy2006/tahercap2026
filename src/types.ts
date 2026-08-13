@@ -93,3 +93,11 @@ export interface Review {
   date: string;
   verifiedPurchase: boolean;
 }
+
+export interface User {
+  id: string;
+  name: string;
+  emailOrPhone: string;
+  role: 'admin' | 'customer';
+  loginMethod: 'email' | 'phone';
+}

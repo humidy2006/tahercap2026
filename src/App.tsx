@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Product, CartItem, CustomTupiDesign, Language, Currency, Order } from './types';
+import { Product, CartItem, CustomTupiDesign, Language, Currency, Order, User } from './types';
 import { INITIAL_PRODUCTS } from './data/products';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -13,7 +13,9 @@ import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { InvoiceModal } from './components/InvoiceModal';
 import { AdminPanel } from './components/AdminPanel';
+import { AuthModal } from './components/AuthModal';
 import { Footer } from './components/Footer';
+import { ShieldAlert, X, ShieldCheck } from 'lucide-react';
 
 export default function App() {
   // Global App Settings
@@ -46,6 +48,52 @@ export default function App() {
       console.error('Failed to save products to localStorage:', e);
     }
   }, [products]);
+
+  // User Authentication State with LocalStorage Persistence
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('altaher_auth_user');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse auth user:', e);
+      }
+    }
+    return null;
+  });
+
+  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<'login' | 'signup' | 'admin'>('login');
+  const [adminDeniedAlert, setAdminDeniedAlert] = useState<boolean>(false);
+
+  const handleLoginUser = (user: User) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('altaher_auth_user', JSON.stringify(user));
+    } catch (e) {
+      console.error('Failed to save auth user:', e);
+    }
+  };
+
+  const handleLogoutUser = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('altaher_auth_user');
+  };
+
+  const handleOpenAdminClick = () => {
+    const ADMIN_EMAIL = 'abdullahhumidy@gmail.com';
+    if (!currentUser) {
+      setAuthModalInitialMode('admin');
+      setAuthModalOpen(true);
+      return;
+    }
+
+    if (currentUser.emailOrPhone.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      setAdminOpen(true);
+    } else {
+      setAdminDeniedAlert(true);
+    }
+  };
 
   // Shopping Cart State
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -172,7 +220,12 @@ export default function App() {
         cartCount={totalCartCount}
         onOpenCart={() => setCartOpen(true)}
         onOpenSizeGuide={() => setSizeGuideOpen(true)}
-        onOpenAdmin={() => setAdminOpen(true)}
+        onOpenAdmin={handleOpenAdminClick}
+        currentUser={currentUser}
+        onOpenAuthModal={() => {
+          setAuthModalInitialMode('login');
+          setAuthModalOpen(true);
+        }}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
       />
@@ -279,6 +332,7 @@ export default function App() {
         cartItems={cartItems}
         language={language}
         currency={currency}
+        currentUser={currentUser}
         onOrderCompleted={(order) => {
           setCheckoutOpen(false);
           setCartItems([]);
@@ -293,6 +347,16 @@ export default function App() {
         language={language}
       />
 
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        currentUser={currentUser}
+        onLogin={handleLoginUser}
+        onLogout={handleLogoutUser}
+        language={language}
+        initialMode={authModalInitialMode}
+      />
+
       <AdminPanel
         isOpen={adminOpen}
         onClose={() => setAdminOpen(false)}
@@ -304,6 +368,50 @@ export default function App() {
         language={language}
         currency={currency}
       />
+
+      {/* Admin Access Denied Alert Modal */}
+      {adminDeniedAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-rose-200 text-center space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+
+            <div>
+              <h3 className="font-bold font-serif text-slate-950 text-base">
+                {language === 'bn' ? 'অ্যাডমিন অ্যাক্সেস সংরক্ষিত!' : 'Admin Access Restricted!'}
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                {language === 'bn'
+                  ? `শুধুমাত্র 'abdullahhumidy@gmail.com' অ্যাকাউন্টে লগইন করে টুপির ক্যাটালগ ও দাম পরিবর্তন করা সম্ভব।`
+                  : `Only the official account 'abdullahhumidy@gmail.com' is authorized to access the Admin Panel & change cap prices.`}
+              </p>
+              <p className="text-[11px] font-mono font-bold text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-2">
+                Logged in as: {currentUser?.emailOrPhone}
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setAdminDeniedAlert(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl"
+              >
+                {language === 'bn' ? 'বন্ধ করুন' : 'Close'}
+              </button>
+              <button
+                onClick={() => {
+                  setAdminDeniedAlert(false);
+                  setAuthModalInitialMode('admin');
+                  setAuthModalOpen(true);
+                }}
+                className="flex-1 py-2.5 bg-slate-950 hover:bg-black text-amber-300 text-xs font-bold rounded-xl shadow-sm"
+              >
+                {language === 'bn' ? 'এডমিন লগইন' : 'Switch to Admin'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
