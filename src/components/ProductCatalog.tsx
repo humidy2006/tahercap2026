@@ -10,7 +10,7 @@ interface ProductCatalogProps {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   onQuickView: (product: Product) => void;
-  onAddToCart: (product: Product, size: string, color: { name: string; hex: string }) => void;
+  onAddToCart: (product: Product, size: string) => void;
   onCustomize: (product: Product) => void;
 }
 

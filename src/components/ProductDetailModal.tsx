@@ -9,8 +9,7 @@ interface ProductDetailModalProps {
   onClose: () => void;
   language: Language;
   currency: Currency;
-  onAddToCart: (product: Product, size: string, color: { name: string; hex: string }, quantity: number) => void;
-  onCustomize: (product: Product) => void;
+  onAddToCart: (product: Product, size: string, quantity: number) => void;
   onOpenSizeGuide: () => void;
 }
 
@@ -21,7 +20,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   language,
   currency,
   onAddToCart,
-  onCustomize,
   onOpenSizeGuide
 }) => {
   if (!isOpen || !product) return null;
@@ -29,14 +27,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const isBn = language === 'bn';
 
   const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0] || '48 cm');
-  const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string }>(
-    product.availableColors[0] || { name: 'White', hex: '#FFFFFF' }
-  );
-  const [quantity, setQuantity] = useState<number>(1);
+  const [orderCount, setOrderCount] = useState<number>(1);
   const [addedSuccess, setAddedSuccess] = useState<boolean>(false);
 
   const handleAdd = () => {
-    onAddToCart(product, selectedSize, selectedColor, quantity);
+    onAddToCart(product, selectedSize, orderCount);
     setAddedSuccess(true);
     setTimeout(() => {
       setAddedSuccess(false);
@@ -46,7 +41,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl border border-slate-200 relative my-8 animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-200 relative my-8 animate-in fade-in zoom-in duration-200">
         
         {/* Close Button */}
         <button
@@ -63,7 +58,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div className="w-full aspect-square rounded-xl overflow-hidden shadow-md bg-white border border-slate-200">
               <img
                 src={product.image}
-                alt={product.title}
+                alt={`${product.category} ${product.designNumber}`}
                 className="w-full h-full object-cover object-center"
                 referrerPolicy="no-referrer"
               />
@@ -73,92 +68,53 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <span className="bg-slate-950 text-amber-300 font-extrabold text-xs px-3 py-1 rounded-full shadow-md">
                 {isBn ? product.categoryBn : product.category}
               </span>
-              {product.designNumber && (
-                <span className="bg-amber-500 text-slate-950 font-mono font-extrabold text-xs px-2.5 py-1 rounded-full shadow-md">
-                  {product.designNumber}
-                </span>
-              )}
             </div>
           </div>
 
-          {/* Product Content Section */}
+          {/* Product Details Section */}
           <div className="p-6 md:p-8 flex flex-col justify-between space-y-6">
             <div className="space-y-4">
               
-              {/* Category & Rating */}
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-900 font-bold bg-slate-100 px-2.5 py-1 rounded-md">
-                  Crown Height: {isBn ? product.crownHeightBn : product.crownHeight}
+              {/* Category & Design No Header */}
+              <div className="border-b border-slate-100 pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-600 block mb-1">
+                  {isBn ? product.categoryBn : product.category}
                 </span>
-                <div className="flex items-center text-amber-500 font-bold gap-1">
-                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  <span>{product.rating}</span>
-                  <span className="text-slate-400">({product.reviewsCount} {isBn ? 'রিভিউ' : 'reviews'})</span>
-                </div>
+                <h2 className="text-2xl font-black font-mono text-slate-900">
+                  {product.designNumber || 'Design #101'}
+                </h2>
               </div>
 
-              {/* Title */}
-              <h2 className="text-xl md:text-2xl font-bold font-serif text-slate-900 leading-snug">
-                {isBn ? product.titleBn : product.title}
-              </h2>
-
-              {/* Price */}
-              <div className="flex items-baseline gap-3">
-                <span className="text-2xl font-extrabold text-slate-950 font-serif">
-                  {formatPrice(product.price * quantity, currency)}
-                </span>
-                {product.originalPrice && (
-                  <span className="text-sm text-slate-400 line-through">
-                    {formatPrice(product.originalPrice * quantity, currency)}
+              {/* Price & Price Quantity */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs font-bold text-slate-500 uppercase">
+                    {isBn ? 'মূল্য (Price)' : 'Price'}
                   </span>
-                )}
-                {quantity > 1 && (
-                  <span className="text-xs text-slate-500 font-medium">
-                    ({formatPrice(product.price, currency)} x {quantity})
-                  </span>
-                )}
-              </div>
-
-              {/* Description */}
-              <p className="text-xs md:text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
-                {isBn ? product.descriptionBn : product.description}
-              </p>
-
-              {/* Fabric Specs */}
-              <div className="text-xs space-y-1">
-                <span className="font-bold text-slate-700">{isBn ? 'কাপড়ের ধরন: ' : 'Fabric Spec: '}</span>
-                <span className="text-slate-600">{isBn ? product.fabricBn : product.fabric}</span>
-              </div>
-
-              {/* Color Selector */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-700">
-                  <span>{isBn ? 'রং নির্বাচন করুন' : 'Select Color:'}</span>
-                  <span className="text-slate-900 font-medium">{selectedColor.name}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-slate-950 font-serif">
+                      {formatPrice(product.price * orderCount, currency)}
+                    </span>
+                    {product.originalPrice && (
+                      <span className="text-sm text-slate-400 line-through">
+                        {formatPrice(product.originalPrice * orderCount, currency)}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  {product.availableColors.map((color, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedColor(color)}
-                      style={{ backgroundColor: color.hex }}
-                      className={`w-7 h-7 rounded-full border border-slate-300 transition-transform flex items-center justify-center ${
-                        selectedColor.name === color.name ? 'ring-2 ring-slate-900 ring-offset-2 scale-110' : 'opacity-80 hover:opacity-100'
-                      }`}
-                      title={color.name}
-                    >
-                      {selectedColor.name === color.name && (
-                        <Check className={`w-3.5 h-3.5 ${color.hex === '#FFFFFF' ? 'text-black' : 'text-white'}`} />
-                      )}
-                    </button>
-                  ))}
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
+                  <span className="font-bold text-slate-600">{isBn ? 'প্যাকেজ পরিমাণ:' : 'Price Quantity:'}</span>
+                  <span className="font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                    {product.quantity || '1 Pc'}
+                  </span>
                 </div>
               </div>
 
               {/* Size Selector & Guide Link */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-700">{isBn ? 'সাইজ নির্বাচন করুন' : 'Select Size:'}</span>
+                  <span className="font-bold text-slate-800">{isBn ? 'সাইজ নির্বাচন করুন (cm):' : 'Select Size (cm):'}</span>
                   <button
                     onClick={onOpenSizeGuide}
                     className="text-amber-600 hover:text-amber-800 font-bold flex items-center gap-1"
@@ -172,7 +128,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <button
                       key={idx}
                       onClick={() => setSelectedSize(sz)}
-                      className={`py-2 px-2 text-xs font-bold rounded-lg border transition ${
+                      className={`py-2 px-2 text-xs font-extrabold font-mono rounded-lg border transition ${
                         selectedSize === sz
                           ? 'bg-slate-950 text-amber-300 border-slate-950 shadow-xs'
                           : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
@@ -184,19 +140,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Quantity Picker */}
-              <div className="flex items-center space-x-4 pt-1">
-                <span className="text-xs font-bold text-slate-700">{isBn ? 'পরিমাণ:' : 'Quantity:'}</span>
+              {/* Order Item Counter */}
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <span className="font-bold text-slate-700">{isBn ? 'অর্ডার সংখ্যা:' : 'Order Pack:'}</span>
                 <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white">
                   <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    onClick={() => setOrderCount(Math.max(1, orderCount - 1))}
                     className="px-3 py-1 bg-slate-100 hover:bg-slate-200 font-bold text-slate-700"
                   >
                     -
                   </button>
-                  <span className="px-4 py-1 text-sm font-bold text-slate-800">{quantity}</span>
+                  <span className="px-4 py-1 text-sm font-bold text-slate-800">{orderCount}</span>
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => setOrderCount(orderCount + 1)}
                     className="px-3 py-1 bg-slate-100 hover:bg-slate-200 font-bold text-slate-700"
                   >
                     +
@@ -206,8 +162,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             </div>
 
-            {/* Bottom Actions */}
-            <div className="pt-4 border-t border-slate-200 space-y-3">
+            {/* Bottom Add to Cart Button */}
+            <div className="pt-4 border-t border-slate-200">
               <button
                 onClick={handleAdd}
                 disabled={addedSuccess}
@@ -229,19 +185,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </>
                 )}
               </button>
-
-              {product.isCustomizable && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onCustomize(product);
-                  }}
-                  className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2"
-                >
-                  <Scissors className="w-4 h-4" />
-                  <span>{isBn ? 'এই টুপি নিজের মাপে কাস্টমাইজ করুন' : 'Customize This Cap Design'}</span>
-                </button>
-              )}
             </div>
 
           </div>

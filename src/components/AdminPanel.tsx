@@ -141,16 +141,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // New Product Modal Form State
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newTitleBn, setNewTitleBn] = useState('');
   const [newCategory, setNewCategory] = useState('Omani & Zari Series');
   const [newDesignNumber, setNewDesignNumber] = useState('Design #109');
   const [newPrice, setNewPrice] = useState('650');
   const [newOriginalPrice, setNewOriginalPrice] = useState('850');
-  const [newStock, setNewStock] = useState('200');
+  const [newQuantity, setNewQuantity] = useState('1 Pc');
   const [newSizesText, setNewSizesText] = useState('48 cm, 50 cm, 52 cm, 54 cm, 56 cm');
-  const [newFabric, setNewFabric] = useState('100% Fine Cotton with Gold Thread');
-  const [newFabricBn, setNewFabricBn] = useState('১০০% ফাইন কটন ও গোল্ডেন জারি');
   const [newImage, setNewImage] = useState(IMAGES.omaniTupi);
 
   useEffect(() => {
@@ -196,13 +192,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     onUpdateProduct(editingProduct);
     setEditingProduct(null);
-    showToast(isBn ? 'টুপি পন্যের তথ্য সফলভাবে আপডেট হয়েছে!' : 'Product updated successfully!');
+    showToast(isBn ? 'পন্যের তথ্য সফলভাবে আপডেট হয়েছে!' : 'Product updated successfully!');
   };
 
   // Create New Product
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle) return;
 
     const parsedSizes = newSizesText
       ? newSizesText.split(',').map(s => s.trim()).filter(Boolean)
@@ -210,41 +205,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const createdProduct: Product = {
       id: 'atg-' + Date.now(),
-      title: newTitle,
-      titleBn: newTitleBn || newTitle,
       category: newCategory,
       categoryBn: newCategory,
       designNumber: newDesignNumber || 'Design #101',
       price: Number(newPrice) || 500,
       originalPrice: Number(newOriginalPrice) || (Number(newPrice) ? Number(newPrice) + 200 : 700),
-      fabric: newFabric,
-      fabricBn: newFabricBn || newFabric,
-      crownHeight: 'Medium (3.2")',
-      crownHeightBn: 'মিডিয়াম (৩.২ ইঞ্চি)',
+      quantity: newQuantity || '1 Pc',
       sizes: parsedSizes,
-      availableColors: [
-        { name: 'Pure White', hex: '#FFFFFF' },
-        { name: 'Royal Maroon', hex: '#7F1D1D' },
-        { name: 'Midnight Black', hex: '#0F172A' }
-      ],
-      rating: 5.0,
-      reviewsCount: 1,
-      isFeatured: true,
-      isCustomizable: true,
       image: newImage,
-      description: 'Newly added Al Taher Cap Garments product item.',
-      descriptionBn: 'আল তাহের ক্যাপ গার্মেন্টসে নতুন সংযোজিত নামাজের টুপি।',
-      stock: Number(newStock) || 150,
-      tags: ['New Arrival', 'Top Cap']
+      isFeatured: true
     };
 
     onAddProduct(createdProduct);
     setShowAddModal(false);
-    showToast(isBn ? 'নতুন টুপি ক্যাটালগে যুক্ত হয়েছে!' : 'New Cap added to catalog!');
-
-    // Reset Form
-    setNewTitle('');
-    setNewTitleBn('');
+    showToast(isBn ? 'নতুন পন্য যুক্ত হয়েছে!' : 'New Product added!');
   };
 
   const sampleImages = [
@@ -386,29 +360,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">Cap Name (English) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        placeholder="e.g. Royal Omani Crown Cap"
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium focus:ring-2 focus:ring-slate-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">টুপির নাম (বাংলা)</label>
-                      <input
-                        type="text"
-                        value={newTitleBn}
-                        onChange={(e) => setNewTitleBn(e.target.value)}
-                        placeholder="যেমন: রাজকীয় ওমানি ক্রাউন টুপি"
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium focus:ring-2 focus:ring-slate-900"
-                      />
-                    </div>
-
-                    <div>
                       <label className="block font-bold text-slate-700 mb-1">{isBn ? 'ক্যাটাগরি / সিরিজ' : 'Category'}</label>
                       <select
                         value={newCategory}
@@ -459,11 +410,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
 
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">{isBn ? 'স্টক পরিমাণ (Quantity / Pcs)' : 'Quantity / Stock (Pcs)'}</label>
+                      <label className="block font-bold text-slate-700 mb-1">{isBn ? 'মূল্যের পরিমাণ (Quantity Unit)' : 'Price Quantity Unit'}</label>
                       <input
-                        type="number"
-                        value={newStock}
-                        onChange={(e) => setNewStock(e.target.value)}
+                        type="text"
+                        value={newQuantity}
+                        onChange={(e) => setNewQuantity(e.target.value)}
+                        placeholder="e.g. 1 Pc or 1 Dozen (12 Pcs)"
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-bold"
                       />
                     </div>
@@ -482,16 +434,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <p className="text-[10px] text-slate-500 mt-1">
                         {isBn ? 'কমা (,) দিয়ে আলাদা করুন। যেমন: 48 cm মানে সাইজ 48' : 'Comma separated values. e.g. 48 cm means Size 48.'}
                       </p>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="block font-bold text-slate-700 mb-1">Fabric Specification</label>
-                      <input
-                        type="text"
-                        value={newFabric}
-                        onChange={(e) => setNewFabric(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2"
-                      />
                     </div>
 
                     <div className="md:col-span-2 space-y-2 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
@@ -581,7 +523,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                     <h5 className="font-bold text-slate-950 text-sm uppercase flex items-center gap-2">
                       <Edit2 className="w-4 h-4 text-amber-600" />
-                      <span>Edit Product: {editingProduct.title}</span>
+                      <span>Edit Product: {editingProduct.designNumber}</span>
                     </h5>
                     <button type="button" onClick={() => setEditingProduct(null)} className="text-slate-400 hover:text-slate-700">
                       <X className="w-4 h-4" />
@@ -589,24 +531,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Cap Title (EN)</label>
-                      <input
-                        type="text"
-                        value={editingProduct.title}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, title: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Cap Title (BN)</label>
-                      <input
-                        type="text"
-                        value={editingProduct.titleBn}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, titleBn: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-semibold"
-                      />
-                    </div>
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">{isBn ? 'ক্যাটাগরি / সিরিজ' : 'Category'}</label>
                       <select
@@ -643,11 +567,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">{isBn ? 'স্টক / পরিমাণ (Pcs)' : 'Quantity / Stock (Pcs)'}</label>
+                      <label className="block font-bold text-slate-700 mb-1">{isBn ? 'মূল্যের পরিমাণ (Quantity Unit)' : 'Price Quantity Unit'}</label>
                       <input
-                        type="number"
-                        value={editingProduct.stock}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, stock: Number(e.target.value) })}
+                        type="text"
+                        value={editingProduct.quantity || ''}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, quantity: e.target.value })}
+                        placeholder="e.g. 1 Pc or 1 Dozen"
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-bold"
                       />
                     </div>
@@ -669,18 +594,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         {isBn ? 'কমা (,) দিয়ে সেমি সাইজ লিখুন। যেমন: 48 cm মানে সাইজ 48' : 'Separate with commas. e.g. 48 cm means Size 48.'}
                       </p>
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block font-bold text-slate-700 mb-1">Fabric</label>
-                      <input
-                        type="text"
-                        value={editingProduct.fabric}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, fabric: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2"
-                      />
-                    </div>
                     <div className="md:col-span-2 space-y-2 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
                       <label className="block font-bold text-slate-900 text-xs flex items-center justify-between">
-                        <span>{isBn ? 'টুপির ছবি আপডেট করুন (কম্পিউটার বা প্রিসেট থেকে)' : 'Update Product Photo (Upload local file or pick presets)'}</span>
+                        <span>{isBn ? 'ছবি আপডেট করুন (কম্পিউটার বা প্রিসেট থেকে)' : 'Update Product Photo (Upload local file or pick presets)'}</span>
                       </label>
 
                       <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -774,11 +690,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-950 text-amber-300 font-bold uppercase">
                     <tr>
-                      <th className="p-3">{isBn ? 'টুপি / ছবি' : 'Cap / Image'}</th>
+                      <th className="p-3">{isBn ? 'ছবি' : 'Cap Photo'}</th>
                       <th className="p-3">{isBn ? 'ক্যাটাগরি' : 'Category'}</th>
                       <th className="p-3">{isBn ? 'ডিজাইন নং' : 'Design No.'}</th>
                       <th className="p-3">{isBn ? 'মূল্য (৳)' : 'Price (৳)'}</th>
-                      <th className="p-3">{isBn ? 'পরিমাণ (স্টক)' : 'Quantity (Stock)'}</th>
+                      <th className="p-3">{isBn ? 'মূল্যের পরিমাণ' : 'Quantity Unit'}</th>
                       <th className="p-3">{isBn ? 'সাইজ (cm)' : 'Sizes (cm)'}</th>
                       <th className="p-3 text-right">{isBn ? 'অ্যাকশন' : 'Actions'}</th>
                     </tr>
@@ -796,21 +712,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   setSelectedProductForQuickImage(p);
                                   activeQuickUploadRowRef.current?.click();
                                 }}
-                                className="relative w-11 h-11 group cursor-pointer shrink-0"
+                                className="relative w-12 h-12 group cursor-pointer shrink-0"
                                 title={isBn ? 'কম্পিউটার/ফোন থেকে ছবি বদলাতে এখানে ক্লিক করুন' : 'Click to change photo from local device'}
                               >
                                 <img
                                   src={p.image}
-                                  alt={p.title}
-                                  className="w-11 h-11 object-cover rounded-lg border border-slate-200 shadow-xs group-hover:opacity-85 transition"
+                                  alt={p.designNumber}
+                                  className="w-12 h-12 object-cover rounded-lg border border-slate-200 shadow-xs group-hover:opacity-85 transition"
                                 />
                                 <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
                                   <Camera className="w-4 h-4 text-amber-300" />
                                 </div>
-                              </div>
-                              <div>
-                                <p className="font-bold text-slate-900">{p.title}</p>
-                                <p className="text-[10px] text-slate-500">{p.titleBn}</p>
                               </div>
                             </div>
                           </td>
@@ -822,7 +734,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </td>
 
                           <td className="p-3 font-mono font-extrabold text-slate-900">
-                            <span className="bg-amber-100/70 border border-amber-300 text-amber-900 px-2 py-0.5 rounded text-[11px]">
+                            <span className="bg-amber-100/70 border border-amber-300 text-amber-900 px-2.5 py-1 rounded text-[11px]">
                               {p.designNumber || 'Design #101'}
                             </span>
                           </td>
@@ -871,7 +783,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             )}
                           </td>
 
-                          <td className="p-3 font-bold text-slate-800">{p.stock} Pcs</td>
+                          <td className="p-3 font-extrabold text-emerald-800">
+                            <span className="bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                              {p.quantity || '1 Pc'}
+                            </span>
+                          </td>
 
                           <td className="p-3 text-slate-600 font-medium">
                             <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">
@@ -890,9 +806,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             <button
                               onClick={() => {
-                                if (window.confirm(isBn ? `"${p.title}" টুপিটি মুছে ফেলতে চান?` : `Delete product "${p.title}"?`)) {
+                                if (window.confirm(isBn ? `"${p.designNumber}" পণ্যটি মুছে ফেলতে চান?` : `Delete product "${p.designNumber}"?`)) {
                                   onDeleteProduct(p.id);
-                                  showToast(isBn ? 'টুপি মোছা হয়েছে' : 'Product deleted');
+                                  showToast(isBn ? 'পণ্যটি মোছা হয়েছে' : 'Product deleted');
                                 }
                               }}
                               className="p-1.5 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded transition"

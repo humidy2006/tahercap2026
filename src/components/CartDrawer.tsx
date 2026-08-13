@@ -123,12 +123,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
                     {/* Specifications */}
                     <div className="text-[11px] text-slate-500 flex flex-wrap gap-2">
-                      <span className="flex items-center gap-1">
-                        <span
-                          style={{ backgroundColor: item.selectedColor.hex }}
-                          className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block"
-                        />
-                        {item.selectedColor.name}
+                      <span className="font-semibold text-slate-800">
+                        Design: {item.product.designNumber || item.product.category}
                       </span>
                       <span>•</span>
                       <span>Size: {item.selectedSize}</span>

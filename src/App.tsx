@@ -147,10 +147,9 @@ export default function App() {
   const handleAddToCart = (
     product: Product,
     selectedSize: string,
-    selectedColor: { name: string; hex: string },
     quantity: number = 1
   ) => {
-    const cartItemId = `${product.id}-${selectedSize}-${selectedColor.name}`;
+    const cartItemId = `${product.id}-${selectedSize}`;
     
     setCartItems(prev => {
       const existing = prev.find(item => item.id === cartItemId);
@@ -164,7 +163,6 @@ export default function App() {
         {
           id: cartItemId,
           product,
-          selectedColor,
           selectedSize,
           quantity
         }
@@ -177,26 +175,14 @@ export default function App() {
     const customProductId = 'custom-tupi-' + Date.now();
     const customProduct: Product = {
       id: customProductId,
-      title: `Custom ${design.baseStyle} (${design.fabric})`,
-      titleBn: `কাস্টম ${design.baseStyle} (${design.fabric})`,
       category: 'Custom Studio',
       categoryBn: 'কাস্টম স্টুডিও',
+      designNumber: `CUST-${Date.now().toString().slice(-4)}`,
       price: design.unitPrice,
-      fabric: design.fabric,
-      fabricBn: design.fabric,
-      crownHeight: design.crownHeight.includes('3.8') ? 'Tall/Hard (3.8")' : 'Medium (3.2")',
-      crownHeightBn: design.crownHeight,
+      quantity: `${design.quantity} Pc`,
       sizes: [design.size],
-      availableColors: [design.baseColor],
-      rating: 5.0,
-      reviewsCount: 1,
-      isFeatured: true,
-      isCustomizable: true,
       image: INITIAL_PRODUCTS[0].image,
-      description: `Tailored Custom Cap: ${design.embroideryPattern}, Color: ${design.baseColor.name}, Custom Text: "${design.customText || 'None'}"`,
-      descriptionBn: `কাস্টম সেলাই: ${design.embroideryPattern}, রং: ${design.baseColor.name}, লেখা: "${design.customText || 'নেই'}"`,
-      stock: 999,
-      tags: ['Custom Design']
+      isFeatured: true
     };
 
     const cartItemId = `custom-${Date.now()}`;

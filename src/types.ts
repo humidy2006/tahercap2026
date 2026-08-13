@@ -3,36 +3,27 @@ export type Currency = 'BDT' | 'USD' | 'SAR' | 'AED';
 
 export interface Product {
   id: string;
-  title: string;
-  titleBn: string;
   category: string;
   categoryBn: string;
-  designNumber: string; // e.g. "DES-48" or "48"
+  designNumber: string; // e.g. "Design #101" or "48"
   price: number; // in BDT
   originalPrice?: number;
-  stock: number; // available quantity
+  quantity: string; // Price Quantity, e.g. "1 Pc", "1 Dozen (12 Pcs)", "10 Pcs"
   sizes: string[]; // size array in cm (e.g. ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm'])
-  fabric: string;
-  fabricBn: string;
-  crownHeight: 'Short (2.5")' | 'Medium (3.2")' | 'Tall/Hard (3.8")';
-  crownHeightBn: string;
-  availableColors: { name: string; hex: string }[];
-  rating: number;
-  reviewsCount: number;
-  isFeatured: boolean;
-  isCustomizable: boolean;
   image: string;
-  description: string;
-  descriptionBn: string;
-  tags: string[];
+  title?: string;
+  titleBn?: string;
+  description?: string;
+  descriptionBn?: string;
+  isFeatured?: boolean;
 }
 
 export interface CartItem {
   id: string; // unique cart item id
   product: Product;
-  selectedColor: { name: string; hex: string };
   selectedSize: string;
-  quantity: number;
+  selectedColor?: { name: string; hex: string };
+  quantity: number; // Cart order item multiplier
   isCustomItem?: boolean;
   customDetails?: CustomTupiDesign;
 }
