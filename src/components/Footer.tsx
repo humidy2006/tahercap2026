@@ -2,6 +2,7 @@ import React from 'react';
 import { Factory, ShieldCheck, Phone, Mail, MapPin, Globe, Heart, Scissors, PackageCheck } from 'lucide-react';
 import { Language } from '../types';
 import { COMPANY_DETAILS } from '../data/company';
+import { CompanyLogo } from './CompanyLogo';
 
 interface FooterProps {
   language: Language;
@@ -74,12 +75,13 @@ export const Footer: React.FC<FooterProps> = ({
         {/* Col 1: Brand Info */}
         <div className="md:col-span-5 space-y-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-amber-400 text-slate-950 rounded-xl flex items-center justify-center font-serif font-bold text-lg">
-              T
-            </div>
+            <CompanyLogo className="w-12 h-12" />
             <div>
-              <h3 className="font-bold font-serif text-xl text-white">
-                {isBn ? COMPANY_DETAILS.nameBn : COMPANY_DETAILS.name}
+              <h3 className="font-bold font-serif text-xl text-white flex items-center gap-2">
+                <span>{isBn ? COMPANY_DETAILS.nameBn : COMPANY_DETAILS.name}</span>
+                <span className="text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full font-mono font-bold">
+                  Est. {COMPANY_DETAILS.estYear}
+                </span>
               </h3>
               <p className="text-xs text-amber-300 font-medium">
                 {isBn ? COMPANY_DETAILS.taglineBn : COMPANY_DETAILS.tagline}

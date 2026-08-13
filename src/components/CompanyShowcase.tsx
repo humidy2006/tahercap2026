@@ -2,6 +2,7 @@ import React from 'react';
 import { Factory, Award, ShieldCheck, MapPin, Phone, Mail, Globe, Users, CheckCircle, Cpu, Truck, Clock } from 'lucide-react';
 import { Language } from '../types';
 import { COMPANY_DETAILS } from '../data/company';
+import { CompanyLogo } from './CompanyLogo';
 
 interface CompanyShowcaseProps {
   language: Language;
@@ -14,15 +15,15 @@ export const CompanyShowcase: React.FC<CompanyShowcaseProps> = ({ language }) =>
     <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-12">
       
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-black text-white rounded-3xl p-8 md:p-12 shadow-xl border border-amber-400/30 relative overflow-hidden">
-        <div className="relative z-10 max-w-3xl space-y-4">
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-black text-white rounded-3xl p-8 md:p-12 shadow-xl border border-amber-400/30 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="relative z-10 max-w-2xl space-y-4">
           <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 border border-amber-400/40 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
             <Factory className="w-4 h-4" />
             <span>{isBn ? 'কোম্পানি পরিচিতি ও কারখানা প্রোফাইল' : 'Official Factory & Company Profile'}</span>
           </div>
 
-          <h2 className="text-3xl sm:text-5xl font-black font-serif text-white leading-tight">
-            {isBn ? COMPANY_DETAILS.nameBn : COMPANY_DETAILS.name}
+          <h2 className="text-3xl sm:text-5xl font-black font-serif text-white leading-tight flex items-center gap-3">
+            <span>{isBn ? COMPANY_DETAILS.nameBn : COMPANY_DETAILS.name}</span>
           </h2>
 
           <p className="text-amber-200 font-medium text-sm md:text-base">
@@ -31,9 +32,14 @@ export const CompanyShowcase: React.FC<CompanyShowcaseProps> = ({ language }) =>
 
           <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
             {isBn
-              ? '২০১২ সালে প্রতিষ্ঠিত আল তাহের ক্যাপ গার্মেন্টস বাংলাদেশে ইসলামিক নামাজের টুপি প্রস্তুত ও রফতানিশিল্পে একটি পথিকৃৎ প্রতিষ্ঠান। সুতি কাপড়ের আরামদায়ক জালি টুপি থেকে শুরু করে ওমানি ও রাজকীয় ভেলভেট বর্ডারের টুপি প্রস্তুত আমাদের বিশেষত্ব।'
-              : 'Established in 2012, Al Taher Cap Garments is a pioneering manufacturer and exporter of traditional Islamic prayer caps in Bangladesh. We combine traditional needlework with state-of-the-art Japanese machinery.'}
+              ? '১৯৯৯ সালে ঢাকার কামরাঙ্গীরচর লোহার পোল এলাকায় প্রতিষ্ঠিত আল তাহের ক্যাপ গার্মেন্টস দীর্ঘ ২৭ বছরের অভিজ্ঞতায় বিশ্বস্ত টুপি প্রস্তুতকারক প্রতিষ্ঠান। সুতি কাপড়ের আরামদায়ক জালি টুপি থেকে শুরু করে ওমানি ও রাজকীয় ভেলভেট বর্ডারের টুপি প্রস্তুত আমাদের মূল বিশেষত্ব।'
+              : 'Established in 1999 in Kamrangirchor, Lohar Bridge, Dhaka, Al Taher Cap Garments brings over 27 years of artisanal craftsmanship in manufacturing and exporting premium Islamic prayer caps.'}
           </p>
+        </div>
+
+        {/* Company Logo Display Card */}
+        <div className="relative z-10 flex-shrink-0">
+          <CompanyLogo className="w-32 h-32 md:w-36 md:h-36" />
         </div>
       </div>
 
@@ -69,12 +75,12 @@ export const CompanyShowcase: React.FC<CompanyShowcaseProps> = ({ language }) =>
           <div className="space-y-2">
             <span className="text-xs font-bold text-amber-600 uppercase tracking-widest">{isBn ? 'আমাদের ইতিহাস' : 'Our Legacy'}</span>
             <h3 className="text-2xl font-bold font-serif text-slate-900">
-              {isBn ? '১২ বছরের অভিজ্ঞতা ও কারিগরী উৎকর্ষ' : '12+ Years of Artisanal Quality'}
+              {isBn ? '২৭+ বছরের গৌরবময় অভিজ্ঞতা (স্থাপিত: ১৯৯৯)' : '27+ Years of Artisanal Quality (Est. 1999)'}
             </h3>
             <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
               {isBn
-                ? 'প্রতিষ্ঠাতা আলহাজ্ব মোহাম্মদ তাহের উদ্দীনের দূরদর্শী নেতৃত্বে ছোট একটি ওয়ার্কশপ থেকে আজ আল তাহের ক্যাপ গার্মেন্টস কেরানীগঞ্জের অন্যতম বৃহৎ টুপি উৎপাদনকারী কারখানায় রূপ নিয়েছে। ১২০+ এরও বেশি দক্ষ দর্জি ও কারিগরের নিরলস পরিশ্রমে তৈরি প্রতিটি টুপি বহন করে সুন্নাহর মর্যাদা ও আরামদায়ক অভিজ্ঞতা।'
-                : 'Under the leadership of Alhajj Mohammad Taher Uddin, Al Taher Cap Garments grew from a modest workshop to an industrial leader employing 120+ skilled artisans and tailors in Keraniganj Industrial Area.'}
+                ? '১৯৯৯ সালে প্রতিষ্ঠাতা আলহাজ্ব মোহাম্মদ তাহের উদ্দীনের দূরদর্শী নেতৃত্বে ঢাকার কামরাঙ্গীরচর লোহার পোল সংলগ্ন এলাকায় আমাদের কারখানার যাত্রা শুরু হয়। আজ আল তাহের ক্যাপ গার্মেন্টস এ অঞ্চলের অন্যতম বৃহৎ ও বিশ্বস্ত টুপি উৎপাদনকারী প্রতিষ্ঠান।'
+                : 'Founded in 1999 under the leadership of Alhajj Mohammad Taher Uddin at Kamrangirchor, Lohar Bridge, Dhaka, Al Taher Cap Garments has grown into an industrial leader employing 150+ skilled artisans.'}
             </p>
           </div>
 

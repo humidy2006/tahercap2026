@@ -3,8 +3,10 @@ import omaniTupiImage from '../assets/images/oman_embroidery_tupi_1786563832403.
 import velvetTupiImage from '../assets/images/velvet_royal_tupi_1786563844032.jpg';
 import cottonTupiImage from '../assets/images/cotton_soft_tupi_1786563854226.jpg';
 import factoryImage from '../assets/images/factory_craftsmanship_1786563864156.jpg';
+import companyLogoImage from '../assets/images/company_logo_1786611354040.jpg';
 
 export const IMAGES = {
+  companyLogo: companyLogoImage,
   heroBanner: heroImage,
   omaniTupi: omaniTupiImage,
   velvetTupi: velvetTupiImage,

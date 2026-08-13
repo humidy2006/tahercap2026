@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Language, Currency, User } from '../types';
 import { COMPANY_DETAILS } from '../data/company';
+import { CompanyLogo } from './CompanyLogo';
 
 interface HeaderProps {
   language: Language;
@@ -125,12 +126,8 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => setActiveTab('shop')} 
           className="flex items-center space-x-3 cursor-pointer group"
         >
-          <div className="w-11 h-11 bg-gradient-to-br from-slate-900 to-black rounded-xl flex items-center justify-center text-amber-400 shadow-md group-hover:scale-105 transition-transform border border-amber-400/30">
-            {/* Custom Crown/Tupi Emblem */}
-            <div className="text-center font-serif font-black text-xl tracking-tighter">
-              <span className="text-amber-300">T</span>
-              <span className="text-slate-300 text-xs block -mt-2">★</span>
-            </div>
+          <div className="group-hover:scale-105 transition-transform">
+            <CompanyLogo className="w-12 h-12" />
           </div>
           <div>
             <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight font-serif flex items-center gap-1.5">
