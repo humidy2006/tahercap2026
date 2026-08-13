@@ -1,0 +1,6 @@
+{
+  "name": "Al Taher Cap Garments",
+  "description": "Premium Islamic Namaz Tupi & Cap E-Commerce Platform with customization, factory wholesale inquiries, size guide, and order management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
