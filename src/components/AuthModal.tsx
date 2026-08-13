@@ -23,38 +23,49 @@ interface AuthModalProps {
 }
 
 const ADMIN_EMAIL = 'abdullahhumidy@gmail.com';
+const ADMIN_PASSWORD = 'Akondo12';
 
 const getStoredAccounts = (): RegisteredAccount[] => {
+  let accounts: RegisteredAccount[] = [];
   try {
     const data = localStorage.getItem('altaher_registered_accounts');
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        accounts = parsed;
       }
     }
   } catch (e) {
     console.error('Failed to load accounts:', e);
   }
 
-  // Default initial accounts if empty
-  const defaultAccounts: RegisteredAccount[] = [
-    {
+  // Ensure admin account exists with official security password 'Akondo12'
+  const adminIndex = accounts.findIndex(a => a.emailOrPhone.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+  if (adminIndex >= 0) {
+    accounts[adminIndex] = {
+      ...accounts[adminIndex],
+      password: ADMIN_PASSWORD,
+      role: 'admin'
+    };
+  } else {
+    accounts.push({
       id: 'admin_default',
       name: 'Abdullah (Admin)',
       emailOrPhone: ADMIN_EMAIL,
-      password: 'admin',
+      password: ADMIN_PASSWORD,
       role: 'admin',
       loginMethod: 'email',
       createdAt: new Date().toISOString()
-    }
-  ];
-  try {
-    localStorage.setItem('altaher_registered_accounts', JSON.stringify(defaultAccounts));
-  } catch (e) {
-    console.error('Failed to save default account:', e);
+    });
   }
-  return defaultAccounts;
+
+  try {
+    localStorage.setItem('altaher_registered_accounts', JSON.stringify(accounts));
+  } catch (e) {
+    console.error('Failed to save accounts:', e);
+  }
+
+  return accounts;
 };
 
 const saveAccounts = (accounts: RegisteredAccount[]) => {
@@ -219,21 +230,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (input !== ADMIN_EMAIL.toLowerCase()) {
       setErrorMessage(
         isBn
-          ? `অ্যাক্সেস সংরক্ষিত! শুধুমাত্র '${ADMIN_EMAIL}' ইমেইল এডমিন হিসেবে লগইন করতে পারবে।`
-          : `Access Restricted! Only '${ADMIN_EMAIL}' is authorized for Admin login.`
+          ? 'অনুমোদিত নয়! সঠিক অ্যাডমিন ইমেইল এড্রেস প্রদান করুন।'
+          : 'Access Restricted! Invalid admin email address.'
       );
+      return;
+    }
+
+    if (adminPassword !== ADMIN_PASSWORD) {
+      setErrorMessage(isBn ? 'ভুল এডমিন সিকিউরিটি পাসওয়ার্ড!' : 'Incorrect Admin Security Password!');
       return;
     }
 
     const accounts = getStoredAccounts();
     const adminAccount = accounts.find(a => a.emailOrPhone.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-
-    const expectedPassword = adminAccount ? adminAccount.password : 'admin';
-
-    if (adminPassword !== expectedPassword) {
-      setErrorMessage(isBn ? 'ভুল এডমিন সিকিউরিটি পাসওয়ার্ড!' : 'Incorrect Admin Security Password!');
-      return;
-    }
 
     const adminUser: User = {
       id: adminAccount ? adminAccount.id : 'admin_' + Date.now(),
@@ -317,8 +326,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </p>
                 <p className="text-amber-900 text-[11px]">
                   {isBn 
-                    ? `আপনি একমাত্র অফিশিয়াল অ্যাডমিন '${ADMIN_EMAIL}' হিসেবে লগইন করা আছেন। পণ্য যোগ ও দাম আপডেট করতে পারবেন।`
-                    : `You are logged in as official admin '${ADMIN_EMAIL}'. You have full catalog & price editing authorization.`}
+                    ? 'আপনি অ্যাডমিন হিসেবে লগইন করা আছেন। পণ্য যোগ, এডিট ও দাম আপডেট করার পূর্ণ ক্ষমতা আপনার আছে।'
+                    : 'You are logged in as Admin. You have full catalog & price editing authorization.'}
                 </p>
               </div>
             ) : (
@@ -365,7 +374,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 type="button"
                 onClick={() => {
                   setActiveTab('admin');
-                  setEmailOrPhone(ADMIN_EMAIL);
+                  setEmailOrPhone('');
+                  setAdminPassword('');
                   setErrorMessage(null);
                 }}
                 className={`flex-1 py-2 rounded-lg transition flex items-center justify-center gap-1.5 ${
@@ -537,7 +547,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </form>
             )}
 
-            {/* TAB 2: ADMIN LOGIN (STRICTLY FOR ABDULLAHHUMIDY@GMAIL.COM) */}
+            {/* TAB 2: ADMIN LOGIN */}
             {activeTab === 'admin' && (
               <form onSubmit={handleAdminSubmit} className="space-y-3.5 text-xs bg-slate-900 text-white p-4 rounded-xl border border-slate-800">
                 <div className="bg-amber-400/10 border border-amber-400/30 p-2.5 rounded-lg text-amber-300 text-[11px] leading-relaxed flex items-start gap-2">
@@ -546,8 +556,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <p className="font-bold">{isBn ? 'সংরক্ষিত অ্যাডমিন এক্সেস' : 'Protected Administrator Access'}</p>
                     <p className="text-slate-300 mt-0.5">
                       {isBn
-                        ? `শুধুমাত্র '${ADMIN_EMAIL}' ইমেইল এডমিন প্যানেলে প্রবেশের অনুমতি পাবে।`
-                        : `Admin controls are locked exclusively for '${ADMIN_EMAIL}'.`}
+                        ? 'প্রবেশ করতে অনুমোদিত এডমিন ইমেইল ও পাসওয়ার্ড প্রদান করুন।'
+                        : 'Enter authorized admin email and password to access.'}
                     </p>
                   </div>
                 </div>
@@ -562,7 +572,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       required
                       value={emailOrPhone}
                       onChange={(e) => setEmailOrPhone(e.target.value)}
-                      placeholder={ADMIN_EMAIL}
+                      placeholder={isBn ? 'এডমিন ইমেইল এড্রেস' : 'Admin Email Address'}
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 font-mono text-amber-300 focus:border-amber-400 focus:outline-none"
                     />
                     <Mail className="w-4 h-4 text-amber-400 absolute left-3 top-3" />

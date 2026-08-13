@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as ImageIcon, Save, Check, Upload, FolderOpen } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as ImageIcon, Save, Check, Upload, FolderOpen, Camera } from 'lucide-react';
 import { Product, WholesaleInquiry, Order, Language, Currency } from '../types';
 import { formatPrice } from '../utils/currency';
 import { IMAGES } from '../data/images';
@@ -44,43 +44,92 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Optimize and process uploaded image files (resize to web max 800px)
+  const processImageFile = (file: File, onSuccess: (base64Url: string) => void) => {
+    if (!file.type.startsWith('image/')) {
+      alert(isBn ? 'দয়া করে একটি সঠিক ছবি (JPG, PNG, WebP, GIF) ফাইল নির্বাচন করুন।' : 'Please select a valid image file (JPG, PNG, WebP, GIF).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const rawDataUrl = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          onSuccess(compressed);
+        } else {
+          onSuccess(rawDataUrl);
+        }
+      };
+      img.onerror = () => onSuccess(rawDataUrl);
+      img.src = rawDataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Handle File Upload from Computer for New Product
   const handleFileUploadForNew = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      alert(isBn ? 'দয়া করে একটি ছবি/ইমেজ ফাইল সিলেক্ট করুন।' : 'Please select a valid image file.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setNewImage(event.target.result as string);
-        showToast(isBn ? 'কম্পিউটার ফোল্ডার থেকে ছবি লোড হয়েছে!' : 'Photo loaded from computer folder!');
-      }
-    };
-    reader.readAsDataURL(file);
+    processImageFile(file, (imgUrl) => {
+      setNewImage(imgUrl);
+      showToast(isBn ? 'কম্পিউটার বা ডিভাইস থেকে ছবি লোড হয়েছে!' : 'Photo uploaded successfully from device!');
+    });
   };
 
   // Handle File Upload from Computer for Editing Product
   const handleFileUploadForEdit = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editingProduct) return;
-    if (!file.type.startsWith('image/')) {
-      alert(isBn ? 'দয়া করে একটি ছবি/ইমেজ ফাইল সিলেক্ট করুন।' : 'Please select a valid image file.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setEditingProduct({
-          ...editingProduct,
-          image: event.target.result as string
-        });
-        showToast(isBn ? 'কম্পিউটার থেকে ছবি আপডেট হয়েছে!' : 'Photo updated from computer!');
-      }
-    };
-    reader.readAsDataURL(file);
+    processImageFile(file, (imgUrl) => {
+      setEditingProduct({
+        ...editingProduct,
+        image: imgUrl
+      });
+      showToast(isBn ? 'নতুন ছবি সফলভাবে যুক্ত হয়েছে!' : 'New product photo applied!');
+    });
+  };
+
+  // Quick Direct Row Image Upload
+  const activeQuickUploadRowRef = useRef<HTMLInputElement | null>(null);
+  const [selectedProductForQuickImage, setSelectedProductForQuickImage] = useState<Product | null>(null);
+
+  const handleFileUploadForQuickRow = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedProductForQuickImage) return;
+
+    processImageFile(file, (imgUrl) => {
+      const updated = {
+        ...selectedProductForQuickImage,
+        image: imgUrl
+      };
+      onUpdateProduct(updated);
+      setSelectedProductForQuickImage(null);
+      showToast(isBn ? `"${updated.title}" এর নতুন ছবি আপডেট হয়েছে!` : `Updated photo for "${updated.title}"!`);
+    });
   };
 
   // Inline Quick Price Editing State
@@ -553,18 +602,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                     <div className="md:col-span-2 space-y-2 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
                       <label className="block font-bold text-slate-900 text-xs flex items-center justify-between">
-                        <span>{isBn ? 'টুপির ছবি আপডেট করুন (কম্পিউটার বা ডিভাইস থেকে)' : 'Update Product Photo (Upload from Computer)'}</span>
+                        <span>{isBn ? 'টুপির ছবি আপডেট করুন (কম্পিউটার বা প্রিসেট থেকে)' : 'Update Product Photo (Upload local file or pick presets)'}</span>
                       </label>
 
                       <div className="flex flex-col sm:flex-row items-center gap-3">
-                        <div className="w-20 h-20 bg-white border border-slate-300 rounded-xl overflow-hidden shrink-0 shadow-xs">
-                          <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
-                        </div>
+                        <label className="relative w-20 h-20 bg-white border border-slate-300 rounded-xl overflow-hidden shrink-0 shadow-xs cursor-pointer group" title={isBn ? 'ছবি বদলাতে ক্লিক করুন' : 'Click to change photo'}>
+                          <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover group-hover:opacity-85 transition" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-amber-300">
+                            <Camera className="w-5 h-5" />
+                          </div>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleFileUploadForEdit}
+                            className="hidden" 
+                          />
+                        </label>
 
                         <div className="flex-1 space-y-2 w-full">
                           <label className="cursor-pointer bg-slate-950 hover:bg-black text-amber-300 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xs transition border border-amber-400/30 w-fit">
                             <Upload className="w-4 h-4 text-amber-400" />
-                            <span>{isBn ? 'কম্পিউটার ফোল্ডার থেকে নতুন ছবি বেছে নিন' : 'Browse New Photo from Computer Folder'}</span>
+                            <span>{isBn ? 'কম্পিউটার বা ফোন থেকে ছবি আপলোড করুন' : 'Browse Local Photo from Computer/Phone'}</span>
                             <input 
                               type="file" 
                               accept="image/*" 
@@ -573,12 +631,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             />
                           </label>
 
-                          <div>
-                            <label className="block text-[10px] text-slate-500 font-medium">Image URL / Data Path</label>
+                          {/* Presets and URL Fallback */}
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-slate-500 font-medium">
+                              {isBn ? 'অথবা ওয়েবসাইট প্রিসেট ছবি বেছে নিন:' : 'Or pick from preset photos:'}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 mb-1">
+                              {sampleImages.map((s, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setEditingProduct({ ...editingProduct, image: s.url })}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
+                                    editingProduct.image === s.url ? 'bg-slate-950 text-amber-300 border-slate-900' : 'bg-white border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {s.label}
+                                </button>
+                              ))}
+                            </div>
                             <input
                               type="text"
                               value={editingProduct.image}
                               onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                              placeholder="Image URL or Data Path..."
                               className="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-mono text-[10px]"
                             />
                           </div>
@@ -606,6 +682,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </form>
               )}
 
+              {/* Hidden file input for quick direct table row photo change */}
+              <input
+                type="file"
+                ref={activeQuickUploadRowRef}
+                onChange={handleFileUploadForQuickRow}
+                accept="image/*"
+                className="hidden"
+              />
+
               {/* Products Table with Quick Price Edit */}
               <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
                 <table className="w-full text-left text-xs">
@@ -626,11 +711,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <tr key={p.id} className="hover:bg-slate-50">
                           <td className="p-3">
                             <div className="flex items-center gap-3">
-                              <img
-                                src={p.image}
-                                alt={p.title}
-                                className="w-10 h-10 object-cover rounded-lg border border-slate-200"
-                              />
+                              <div
+                                onClick={() => {
+                                  setSelectedProductForQuickImage(p);
+                                  activeQuickUploadRowRef.current?.click();
+                                }}
+                                className="relative w-11 h-11 group cursor-pointer shrink-0"
+                                title={isBn ? 'কম্পিউটার/ফোন থেকে ছবি বদলাতে এখানে ক্লিক করুন' : 'Click to change photo from local device'}
+                              >
+                                <img
+                                  src={p.image}
+                                  alt={p.title}
+                                  className="w-11 h-11 object-cover rounded-lg border border-slate-200 shadow-xs group-hover:opacity-85 transition"
+                                />
+                                <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
+                                  <Camera className="w-4 h-4 text-amber-300" />
+                                </div>
+                              </div>
                               <div>
                                 <p className="font-bold text-slate-900">{p.title}</p>
                                 <p className="text-[10px] text-slate-500">{p.titleBn}</p>
