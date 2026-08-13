@@ -41,7 +41,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       <div className="relative bg-slate-100 aspect-square overflow-hidden cursor-pointer" onClick={() => onQuickView(product)}>
         <img
           src={product.image}
-          alt={`${product.category} ${product.designNumber}`}
+          alt={`Taher Cap - Al Taher Cap ${product.category} ${product.designNumber} Namaz Topi (নামাজের টুপি)`}
           className="w-full h-full object-cover object-center group-hover:scale-108 transition-transform duration-500"
           referrerPolicy="no-referrer"
         />

@@ -14,6 +14,7 @@ import { CheckoutModal } from './components/CheckoutModal';
 import { InvoiceModal } from './components/InvoiceModal';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { Footer } from './components/Footer';
 import { ShieldAlert, X, ShieldCheck } from 'lucide-react';
 
@@ -257,7 +258,7 @@ export default function App() {
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950 pb-16 md:pb-0">
       
       {/* Header */}
       <Header
@@ -339,6 +340,15 @@ export default function App() {
         language={language}
         setActiveTab={setActiveTab}
         onOpenSizeGuide={() => setSizeGuideOpen(true)}
+      />
+
+      {/* Mobile Sticky Bottom Navigation */}
+      <MobileBottomNav
+        language={language}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        cartCount={totalCartCount}
+        onOpenCart={() => setCartOpen(true)}
       />
 
       {/* Modals & Drawers */}

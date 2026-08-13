@@ -48,12 +48,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-serif text-white leading-tight">
               {isBn ? (
                 <>
-                  নামাজের পবিত্রময় স্পর্শে <br />
+                  আসল তাহের ক্যাপ ও নামাজের টুপি <br />
                   <span className="text-amber-400 font-extrabold">আল তাহের ক্যাপ গার্মেন্টস</span>
                 </>
               ) : (
                 <>
-                  Crafting Perfection for Prayer <br />
+                  Authentic Taher Cap & Namaz Topi <br />
                   <span className="text-amber-400 font-extrabold">Al Taher Cap Garments</span>
                 </>
               )}
@@ -61,9 +61,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-2xl mx-auto lg:mx-0">
               {isBn ? (
-                'আমরা দীর্ঘ ১২ বছর ধরে ওমানি ও রয়াল ভেলভেট বর্ডার, সুতি সফট জালি, তুর্কি কাট এবং হস্তশিল্প নকশী টুপি সুনির্দিষ্ট কারিগরি দক্ষতায় প্রস্তুত ও বিশ্বব্যাপী রফতানি করে আসছি। সাধারণ খুচরা কেনাকাটা এবং পাইকারি ডিলারদের জন্য বিশ্বস্ত নাম।'
+                'আমরা দীর্ঘ ১২ বছর ধরে আসল তাহের ক্যাপ (Taher Cap / Al Taher Cap) এবং প্রিমিয়াম নামাজের টুপি (Namaz Topi / Namaz Tupi) প্রস্তুত ও বিশ্বব্যাপী পাইকারি রফতানি করে আসছি। ওমানি জারি, রয়াল ভেলভেট, সফট কটন এবং তুর্কি ও নকশী টুপির সবচেয়ে বড় কারখানা।'
               ) : (
-                'Discover Bangladesh’s finest Islamic prayer caps (Namaz Tupi). From royal velvet zari borders and hand-embroidered Nakshi designs to breathable organic cotton net caps—crafted directly at our Dhaka factory.'
+                'Discover Bangladesh’s premier manufacturer of authentic Taher Cap, Al Taher Cap, and Namaz Topi (Islamic Prayer Caps). From royal velvet zari borders and Omani embroidery to breathable organic cotton net caps—direct from our Dhaka factory.'
               )}
             </p>
 
