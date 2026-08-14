@@ -42,7 +42,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide">
               <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>{isBn ? 'আন্তর্জাতিক মানের আসল কটন ও জারি সেলাই এর টুপি' : 'Est. 2012 • Premier Islamic Cap Manufacturer'}</span>
+              <span>{isBn ? 'স্থাপিত ১৯৯৯ • আন্তর্জাতিক মানের আসল কটন ও জারি সেলাই এর টুপি' : 'Est. 1999 • Premier Islamic Cap Manufacturer'}</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-serif text-white leading-tight">
@@ -61,9 +61,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-2xl mx-auto lg:mx-0">
               {isBn ? (
-                'আমরা দীর্ঘ ১২ বছর ধরে আসল তাহের ক্যাপ (Taher Cap / Al Taher Cap) এবং প্রিমিয়াম নামাজের টুপি (Namaz Topi / Namaz Tupi) প্রস্তুত ও বিশ্বব্যাপী পাইকারি রফতানি করে আসছি। ওমানি জারি, রয়াল ভেলভেট, সফট কটন এবং তুর্কি ও নকশী টুপির সবচেয়ে বড় কারখানা।'
+                'আমরা ১৯৯৯ সাল থেকে দীর্ঘ ২৭ বছর ধরে আসল তাহের ক্যাপ (Taher Cap / Al Taher Cap) এবং প্রিমিয়াম নামাজের টুপি (Namaz Topi / Namaz Tupi) প্রস্তুত ও বিশ্বব্যাপী পাইকারি রফতানি করে আসছি। ওমানি জারি, রয়াল ভেলভেট, সফট কটন এবং তুর্কি ও নকশী টুপির সবচেয়ে বড় কারখানা।'
               ) : (
-                'Discover Bangladesh’s premier manufacturer of authentic Taher Cap, Al Taher Cap, and Namaz Topi (Islamic Prayer Caps). From royal velvet zari borders and Omani embroidery to breathable organic cotton net caps—direct from our Dhaka factory.'
+                'Discover Bangladesh’s premier manufacturer (Est. 1999, 27+ years of legacy) of authentic Taher Cap, Al Taher Cap, and Namaz Topi (Islamic Prayer Caps). From royal velvet zari borders and Omani embroidery to breathable organic cotton net caps—direct from our Dhaka factory.'
               )}
             </p>
 

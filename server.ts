@@ -234,8 +234,29 @@ function saveInquiries(inquiries: any[]) {
 
 // In-memory caching synced with files
 let productsDatabase: any[] = loadProducts();
-const inquiriesDatabase: any[] = loadInquiries();
-const ordersDatabase: any[] = loadOrders();
+let productsLastUpdated: number = Date.now();
+let ordersDatabase: any[] = loadOrders();
+let inquiriesDatabase: any[] = loadInquiries();
+const sseClients = new Set<express.Response>();
+
+// Broadcast changes to all connected users in real-time
+function broadcastProductsUpdate() {
+  productsLastUpdated = Date.now();
+  const payload = JSON.stringify({
+    type: 'PRODUCTS_UPDATED',
+    products: productsDatabase,
+    updatedAt: productsLastUpdated,
+    count: productsDatabase.length
+  });
+
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${payload}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
 
 // SEO Route: robots.txt
 app.get('/robots.txt', (req, res) => {
@@ -290,28 +311,108 @@ app.get('/sitemap.xml', (req, res) => {
 
 // API Route: Get Products (Public for all visitors)
 app.get('/api/products', (req, res) => {
-  // Ensure we return the latest memory state
   return res.json({ 
     products: productsDatabase,
-    updatedAt: Date.now(),
+    updatedAt: productsLastUpdated,
     count: productsDatabase.length 
   });
 });
 
-// API Route: Update / Save Products (Admin Sync - persists for all users on all devices)
+// API Route: Real-Time SSE Stream for Instant Push Sync across all users & devices
+app.get('/api/products/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  // Send current products immediately on connection
+  const initialPayload = JSON.stringify({
+    type: 'INIT',
+    products: productsDatabase,
+    updatedAt: productsLastUpdated,
+    count: productsDatabase.length
+  });
+  res.write(`data: ${initialPayload}\n\n`);
+
+  sseClients.add(res);
+
+  // Heartbeat every 15 seconds to maintain active socket connection
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      clearInterval(heartbeat);
+      sseClients.delete(res);
+    }
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
+});
+
+// API Route: Update Entire Products Array (Admin Batch Sync - persists for all users on all devices)
 app.post('/api/products', (req, res) => {
   const { products } = req.body;
-  if (Array.isArray(products) && products.length > 0) {
+  if (Array.isArray(products)) {
     productsDatabase = products;
     saveProducts(productsDatabase);
+    broadcastProductsUpdate();
     return res.json({ 
       success: true, 
       products: productsDatabase, 
-      updatedAt: Date.now(),
+      updatedAt: productsLastUpdated,
       message: 'Products database synchronized successfully for all users.' 
     });
   }
   return res.status(400).json({ error: 'Invalid products data provided.' });
+});
+
+// API Route: Add Single Product
+app.post('/api/products/add', (req, res) => {
+  const newProduct = req.body;
+  if (!newProduct || !newProduct.id) {
+    return res.status(400).json({ error: 'Valid product object is required.' });
+  }
+  
+  const existingIdx = productsDatabase.findIndex(p => p.id === newProduct.id);
+  if (existingIdx >= 0) {
+    productsDatabase[existingIdx] = newProduct;
+  } else {
+    productsDatabase = [newProduct, ...productsDatabase];
+  }
+  saveProducts(productsDatabase);
+  broadcastProductsUpdate();
+  return res.json({ success: true, products: productsDatabase, product: newProduct });
+});
+
+// API Route: Update Single Product by ID
+app.put('/api/products/:id', (req, res) => {
+  const { id } = req.params;
+  const updatedData = req.body;
+  
+  productsDatabase = productsDatabase.map(p => (p.id === id ? { ...p, ...updatedData } : p));
+  saveProducts(productsDatabase);
+  broadcastProductsUpdate();
+  return res.json({ success: true, products: productsDatabase });
+});
+
+// API Route: Delete Product by ID
+app.delete('/api/products/:id', (req, res) => {
+  const { id } = req.params;
+  productsDatabase = productsDatabase.filter(p => p.id !== id);
+  saveProducts(productsDatabase);
+  broadcastProductsUpdate();
+  return res.json({ success: true, products: productsDatabase, deletedId: id });
+});
+
+// API Route: Reset to Default Catalog
+app.post('/api/products/reset', (req, res) => {
+  productsDatabase = [...DEFAULT_PRODUCTS];
+  saveProducts(productsDatabase);
+  broadcastProductsUpdate();
+  return res.json({ success: true, products: productsDatabase });
 });
 
 // API Route: Gemini AI Tupi Consultant
@@ -327,14 +428,14 @@ app.post('/api/ai-consultant', async (req, res) => {
     if (!apiKey) {
       // Fallback response if GEMINI_API_KEY is not provided yet
       const fallbackMsg = language === 'bn'
-        ? 'আসসালামু আলাইকুম! আল তাহের ক্যাপ গার্মেন্টসে আপনাকে স্বাগতম। আমরা ওমানি, ভেলভেট, সুতি জালি, তুর্কি ও নকশী টুপির রফতানিকারক। আপনার পছন্দের কাপড়ের ধরন বা বাজেট জানালে আমি সেরা টুপিটি সুপারিশ করে দিবো।'
-        : 'Assalamu Alaikum! Welcome to Al Taher Cap Garments. We manufacture Omani, Velvet, Cotton Net, Turkish, and Hand-Embroidered prayer caps. Tell me your fabric or budget preference and I will recommend the best tupi for you.';
+        ? 'আসসালামু আলাইকুম! আল তাহের ক্যাপ গার্মেন্টসে আপনাকে স্বাগতম। আমরা ১৯৯৯ সাল থেকে ওমানি, ভেলভেট, সুতি জালি, তুর্কি ও নকশী টুপির প্রস্তুতকারক ও রফতানিকারক। আপনার পছন্দের কাপড়ের ধরন বা বাজেট জানালে আমি সেরা টুপিটি সুপারিশ করে দিবো।'
+        : 'Assalamu Alaikum! Welcome to Al Taher Cap Garments. We manufacture and export Omani, Velvet, Cotton Net, Turkish, and Hand-Embroidered prayer caps since 1999. Tell me your fabric or budget preference and I will recommend the best tupi for you.';
       return res.json({ reply: fallbackMsg });
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemPrompt = `You are the official AI Tupi & Islamic Attire Consultant for "Al Taher Cap Garments" (আল তাহের ক্যাপ গার্মেন্টস), Bangladesh's premier Islamic Prayer Cap (Namaz Tupi) manufacturer and exporter since 2012.
+    const systemPrompt = `You are the official AI Tupi & Islamic Attire Consultant for "Al Taher Cap Garments" (আল তাহের ক্যাপ গার্মেন্টস), Bangladesh's premier Islamic Prayer Cap (Namaz Tupi) manufacturer and exporter since 1999 (27+ years of legacy).
     
 Your role:
 - Help customers select the ideal Namaz Tupi (Prayer Cap) based on occasion (Eid, Everyday Prayer, Hajj/Umrah, Weddings, Gifts for Elders), season (Hot summer cotton, Royal velvet winter/special), size (21.5 inches to 24 inches), fabric, and budget.
@@ -384,7 +485,8 @@ app.post('/api/inquiry', (req, res) => {
     notes: notes || '',
     status: 'Pending'
   };
-  inquiriesDatabase.push(newInquiry);
+  inquiriesDatabase.unshift(newInquiry);
+  saveInquiries(inquiriesDatabase);
   return res.json({ success: true, inquiry: newInquiry, message: 'Wholesale inquiry received successfully. Our sales team will contact you on WhatsApp / Phone within 2 hours.' });
 });
 
@@ -419,7 +521,8 @@ app.post('/api/orders', (req, res) => {
     transactionId: 'TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase()
   };
 
-  ordersDatabase.push(newOrder);
+  ordersDatabase.unshift(newOrder);
+  saveOrders(ordersDatabase);
   return res.json({ success: true, order: newOrder });
 });
 

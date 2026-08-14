@@ -160,6 +160,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Full Edit Product Modal State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
+  // In-app Confirmation States for safe deletion & reset
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
+
   // New Product Modal Form State
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCategory, setNewCategory] = useState('Omani & Zari Series');
@@ -333,17 +337,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <div className="flex items-center gap-2">
             {onResetProducts && (
-              <button
-                onClick={() => {
-                  if (window.confirm(isBn ? 'সব প্রোডাক্ট ডিফল্ট অবস্থায় নিয়ে যেতে চান?' : 'Reset to initial default products?')) {
-                    onResetProducts();
-                    showToast(isBn ? 'ডিফল্ট ক্যাটালগ রিস্টোর করা হয়েছে' : 'Restored default product catalog');
-                  }
-                }}
-                className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline"
-              >
-                {isBn ? 'ডিফল্ট রিস্টোর' : 'Reset Default'}
-              </button>
+              <>
+                {showResetConfirm ? (
+                  <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-300 px-2.5 py-1 rounded-lg animate-in fade-in">
+                    <span className="text-[11px] font-bold text-rose-800">
+                      {isBn ? 'রিস্টোর নিশ্চিত?' : 'Confirm reset?'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        onResetProducts();
+                        setShowResetConfirm(false);
+                        showToast(isBn ? 'সব প্রোডাক্ট ডিফল্ট অবস্থায় রিস্টোর করা হয়েছে' : 'Restored default product catalog');
+                      }}
+                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] px-2 py-0.5 rounded transition"
+                    >
+                      {isBn ? 'হ্যাঁ' : 'Yes'}
+                    </button>
+                    <button
+                      onClick={() => setShowResetConfirm(false)}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] px-1.5 py-0.5 rounded transition"
+                    >
+                      {isBn ? 'না' : 'No'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowResetConfirm(true)}
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline"
+                  >
+                    {isBn ? 'ডিফল্ট রিস্টোর' : 'Reset Default'}
+                  </button>
+                )}
+              </>
             )}
 
             <button
@@ -1028,30 +1053,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </span>
                           </td>
 
-                          <td className="p-3 text-right space-x-2">
-                            <button
-                              onClick={() => setEditingProduct({
-                                ...p,
-                                images: p.images && p.images.length > 0 ? p.images : [p.image]
-                              })}
-                              className="p-1.5 text-slate-600 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 rounded transition"
-                              title="Full Edit"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
+                          <td className="p-3 text-right">
+                            {deletingProductId === p.id ? (
+                              <div className="inline-flex items-center gap-1 bg-rose-50 border border-rose-300 p-1 rounded-lg animate-in fade-in">
+                                <span className="text-[10px] font-bold text-rose-800">
+                                  {isBn ? 'মুছবেন?' : 'Delete?'}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    onDeleteProduct(p.id);
+                                    setDeletingProductId(null);
+                                    showToast(isBn ? `"${p.designNumber}" পণ্যটি মোছা হয়েছে` : `Product "${p.designNumber}" deleted`);
+                                  }}
+                                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] px-1.5 py-0.5 rounded transition"
+                                >
+                                  {isBn ? 'হ্যাঁ' : 'Yes'}
+                                </button>
+                                <button
+                                  onClick={() => setDeletingProductId(null)}
+                                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] px-1.5 py-0.5 rounded transition"
+                                >
+                                  {isBn ? 'না' : 'No'}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  onClick={() => setEditingProduct({
+                                    ...p,
+                                    images: p.images && p.images.length > 0 ? p.images : [p.image]
+                                  })}
+                                  className="p-1.5 text-slate-600 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 rounded transition"
+                                  title="Full Edit"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
 
-                            <button
-                              onClick={() => {
-                                if (window.confirm(isBn ? `"${p.designNumber}" পণ্যটি মুছে ফেলতে চান?` : `Delete product "${p.designNumber}"?`)) {
-                                  onDeleteProduct(p.id);
-                                  showToast(isBn ? 'পণ্যটি মোছা হয়েছে' : 'Product deleted');
-                                }
-                              }}
-                              className="p-1.5 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded transition"
-                              title="Delete Item"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                                <button
+                                  onClick={() => setDeletingProductId(p.id)}
+                                  className="p-1.5 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded transition"
+                                  title="Delete Item"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       );

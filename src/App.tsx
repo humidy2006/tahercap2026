@@ -34,9 +34,8 @@ export default function App() {
       const res = await fetch('/api/products');
       if (res.ok) {
         const data = await res.json();
-        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+        if (data.products && Array.isArray(data.products)) {
           setProducts(prev => {
-            // Only update state if products have actually changed to avoid unnecessary re-renders
             if (JSON.stringify(prev) !== JSON.stringify(data.products)) {
               localStorage.setItem('altaher_products', JSON.stringify(data.products));
               return data.products;
@@ -66,9 +65,60 @@ export default function App() {
     fetchLatestProducts();
   }, []);
 
-  // 2. Real-Time Auto Polling & Focus Sync (every 6 seconds & when window becomes active)
+  // 2. Real-Time Server-Sent Events (SSE): Instant live push updates for all users & devices
   useEffect(() => {
-    const interval = setInterval(fetchLatestProducts, 6000);
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: any = null;
+
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource('/api/products/stream');
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data && Array.isArray(data.products)) {
+              setProducts(prev => {
+                if (JSON.stringify(prev) !== JSON.stringify(data.products)) {
+                  localStorage.setItem('altaher_products', JSON.stringify(data.products));
+                  return data.products;
+                }
+                return prev;
+              });
+            }
+          } catch (err) {
+            console.error('Error parsing SSE event data:', err);
+          }
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          // Reconnect after 4 seconds if connection drops
+          reconnectTimeout = setTimeout(connectSSE, 4000);
+        };
+      } catch (err) {
+        console.log('SSE connection setup:', err);
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+    };
+  }, []);
+
+  // 3. Fallback Auto Polling (every 3.5s) & Window Focus Sync
+  useEffect(() => {
+    const interval = setInterval(fetchLatestProducts, 3500);
 
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
@@ -86,13 +136,13 @@ export default function App() {
     };
   }, []);
 
-  // 3. Multi-tab Sync in the same browser
+  // 4. Multi-tab Sync in the same browser via storage event
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'altaher_products' && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             setProducts(parsed);
           }
         } catch (err) {
@@ -252,15 +302,26 @@ export default function App() {
     setCartItems(prev => prev.filter(item => item.id !== cartItemId));
   };
 
-  // Admin Actions
-  const handleAddProduct = (newProduct: Product) => {
+  // Admin Actions with Instant Server Sync & Real-Time Broadcast
+  const handleAddProduct = async (newProduct: Product) => {
     const updated = [newProduct, ...products];
-    saveAndSyncProducts(updated);
+    setProducts(updated);
+    try {
+      localStorage.setItem('altaher_products', JSON.stringify(updated));
+      await fetch('/api/products/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProduct)
+      });
+    } catch (e) {
+      console.error('Failed to add product on server:', e);
+      saveAndSyncProducts(updated);
+    }
   };
 
-  const handleUpdateProduct = (updatedProduct: Product) => {
+  const handleUpdateProduct = async (updatedProduct: Product) => {
     const updated = products.map(p => (p.id === updatedProduct.id ? updatedProduct : p));
-    saveAndSyncProducts(updated);
+    setProducts(updated);
 
     // Update quick view modal if actively open
     if (quickViewProduct && quickViewProduct.id === updatedProduct.id) {
@@ -275,21 +336,52 @@ export default function App() {
           : item
       )
     );
+
+    try {
+      localStorage.setItem('altaher_products', JSON.stringify(updated));
+      await fetch(`/api/products/${encodeURIComponent(updatedProduct.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedProduct)
+      });
+    } catch (e) {
+      console.error('Failed to update product on server:', e);
+      saveAndSyncProducts(updated);
+    }
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     const updated = products.filter(p => p.id !== productId);
-    saveAndSyncProducts(updated);
+    setProducts(updated);
 
     if (quickViewProduct && quickViewProduct.id === productId) {
       setQuickViewProduct(null);
     }
 
     setCartItems(prev => prev.filter(item => item.product.id !== productId));
+
+    try {
+      localStorage.setItem('altaher_products', JSON.stringify(updated));
+      await fetch(`/api/products/${encodeURIComponent(productId)}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.error('Failed to delete product on server:', e);
+      saveAndSyncProducts(updated);
+    }
   };
 
-  const handleResetProducts = () => {
-    saveAndSyncProducts(INITIAL_PRODUCTS);
+  const handleResetProducts = async () => {
+    try {
+      const res = await fetch('/api/products/reset', { method: 'POST' });
+      const data = await res.json();
+      if (data && Array.isArray(data.products)) {
+        setProducts(data.products);
+        localStorage.setItem('altaher_products', JSON.stringify(data.products));
+      }
+    } catch (e) {
+      saveAndSyncProducts(INITIAL_PRODUCTS);
+    }
   };
 
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
