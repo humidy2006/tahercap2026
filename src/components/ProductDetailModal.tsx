@@ -36,12 +36,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onAddToCart,
   onOpenSizeGuide
 }) => {
-  if (!isOpen || !product) return null;
-
   const isBn = language === 'bn';
 
   // Compute all unique available images for this product
   const imageList = React.useMemo(() => {
+    if (!product) return [];
     const list: string[] = [];
     if (product.images && product.images.length > 0) {
       product.images.forEach(img => {
@@ -55,7 +54,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   }, [product]);
 
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
-  const [selectedSize, setSelectedSize] = useState<string>(product.sizes?.[0] || '48 cm');
+  const [selectedSize, setSelectedSize] = useState<string>(product?.sizes?.[0] || '48 cm');
   const [orderCount, setOrderCount] = useState<number>(1);
   const [addedSuccess, setAddedSuccess] = useState<boolean>(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -67,6 +66,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   // Reset states when product changes
   useEffect(() => {
+    if (!product) return;
     setActiveImageIndex(0);
     if (product.sizes && product.sizes.length > 0) {
       setSelectedSize(product.sizes[0]);
@@ -74,11 +74,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     setOrderCount(1);
     setIsLightboxOpen(false);
     setZoomScale(1);
-  }, [product.id]);
+  }, [product?.id]);
 
   const handlePrevImage = useCallback((e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setActiveImageIndex((prev) => (prev === 0 ? imageList.length - 1 : prev - 1));
+    setActiveImageIndex((prev) => (prev === 0 ? Math.max(0, imageList.length - 1) : prev - 1));
     setZoomScale(1);
   }, [imageList.length]);
 
@@ -144,6 +144,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
     setLightboxTouchStartX(null);
   };
+
+  if (!isOpen || !product) return null;
 
   const handleAdd = () => {
     onAddToCart(product, selectedSize, orderCount);

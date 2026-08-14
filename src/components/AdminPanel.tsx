@@ -30,8 +30,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   currency,
   isCloudSynced = true
 }) => {
-  if (!isOpen) return null;
-
   const isBn = language === 'bn';
 
   const [activeSubTab, setActiveSubTab] = useState<'products' | 'inquiries' | 'orders'>('products');
@@ -323,6 +321,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     { label: 'Pakistani Cap', url: IMAGES.pakistaniTupi },
     { label: "Kids Cap", url: IMAGES.kidsTupi }
   ];
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto">

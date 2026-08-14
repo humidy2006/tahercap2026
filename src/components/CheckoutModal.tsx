@@ -23,8 +23,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderCompleted,
   currentUser
 }) => {
-  if (!isOpen) return null;
-
   const isBn = language === 'bn';
 
   const [customerName, setCustomerName] = useState('');
@@ -132,6 +130,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setLoading(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
