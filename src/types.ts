@@ -44,17 +44,18 @@ export interface CustomTupiDesign {
 
 export interface WholesaleInquiry {
   id: string;
-  date: string;
+  date?: string;
+  createdAt?: string;
   name: string;
-  companyName: string;
+  companyName?: string;
   phone: string;
-  email: string;
-  country: string;
-  estimatedQuantity: number;
-  tupiType: string;
+  email?: string;
+  country?: string;
+  estimatedQuantity?: number | string;
+  tupiType?: string;
   targetPricePerPiece?: string;
   notes?: string;
-  status: 'Pending' | 'Contacted' | 'Quoted' | 'Completed';
+  status?: 'Pending' | 'Contacted' | 'Quoted' | 'Completed';
 }
 
 export interface Order {

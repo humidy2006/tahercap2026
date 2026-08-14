@@ -3,6 +3,7 @@ import { Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as Imag
 import { Product, WholesaleInquiry, Order, Language, Currency } from '../types';
 import { formatPrice } from '../utils/currency';
 import { IMAGES } from '../data/images';
+import { db, collection, onSnapshot } from '../lib/firebase';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface AdminPanelProps {
   onResetProducts?: () => void;
   language: Language;
   currency: Currency;
+  isCloudSynced?: boolean;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -25,7 +27,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteProduct,
   onResetProducts,
   language,
-  currency
+  currency,
+  isCloudSynced = true
 }) => {
   if (!isOpen) return null;
 
@@ -176,8 +179,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newImages, setNewImages] = useState<string[]>([IMAGES.omaniTupi]);
   const [customImageUrlInput, setCustomImageUrlInput] = useState<string>('');
 
+  // Real-time Firestore subscriptions for Inquiries & Orders
   useEffect(() => {
+    // 1) Firestore Inquiries Listener
+    const unsubInquiries = onSnapshot(collection(db, 'inquiries'), (snapshot) => {
+      if (!snapshot.empty) {
+        const firestoreInquiries: WholesaleInquiry[] = [];
+        snapshot.forEach((d) => {
+          firestoreInquiries.push(d.data() as WholesaleInquiry);
+        });
+        firestoreInquiries.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+        setInquiries(firestoreInquiries);
+      }
+    }, (err) => {
+      console.log('Inquiries firestore listener:', err);
+    });
+
+    // 2) Firestore Orders Listener
+    const unsubOrders = onSnapshot(collection(db, 'orders'), (snapshot) => {
+      if (!snapshot.empty) {
+        const firestoreOrders: Order[] = [];
+        snapshot.forEach((d) => {
+          firestoreOrders.push(d.data() as Order);
+        });
+        firestoreOrders.sort((a, b) => (b.id > a.id ? 1 : -1));
+        setOrders(firestoreOrders);
+      }
+    }, (err) => {
+      console.log('Orders firestore listener:', err);
+    });
+
     fetchInquiriesAndOrders();
+
+    return () => {
+      unsubInquiries();
+      unsubOrders();
+    };
   }, [activeSubTab]);
 
   const fetchInquiriesAndOrders = async () => {
@@ -276,15 +313,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         
         {/* Header */}
         <div className="bg-slate-950 text-white p-4 flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-amber-400" />
-            <div>
-              <h3 className="font-bold font-serif text-amber-200 text-base">
-                {isBn ? 'আল তাহের প্রোডাক্ট ও প্রাইস ম্যানেজার' : 'Al Taher Product & Price Manager'}
-              </h3>
-              <p className="text-[10px] text-slate-400">
-                {isBn ? 'সহজে টুপির দাম পরিবর্তন ও নতুন টুপি যুক্ত করুন' : 'Update prices & add new prayer caps directly'}
-              </p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-amber-400" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold font-serif text-amber-200 text-base">
+                    {isBn ? 'আল তাহের প্রোডাক্ট ও প্রাইস ম্যানেজার' : 'Al Taher Product & Price Manager'}
+                  </h3>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    {isBn ? 'ক্লাউড লাইভ সিঙ্ক সক্রিয়' : 'Cloud Live Sync Active'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  {isBn ? 'ল্যাপটপ বা মোবাইল যেকোনো ডিভাইস থেকে টুপি যোগ/ডিলিট করলে সবার ডিভাইসে সাথে সাথে পরিবর্তন হবে' : 'Changes made from any laptop or mobile sync instantly across all devices'}
+                </p>
+              </div>
             </div>
           </div>
 

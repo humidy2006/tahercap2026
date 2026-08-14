@@ -3,6 +3,7 @@ import { PackageCheck, Truck, ShieldCheck, Send, CheckCircle2, PhoneCall, Buildi
 import { Language, Currency } from '../types';
 import { COMPANY_DETAILS } from '../data/company';
 import { formatPrice } from '../utils/currency';
+import { db, doc, setDoc } from '../lib/firebase';
 
 interface WholesalePortalProps {
   language: Language;
@@ -50,6 +51,15 @@ export const WholesalePortal: React.FC<WholesalePortalProps> = ({ language, curr
     setLoading(true);
 
     try {
+      // 1) Save to Firestore
+      const inquiryId = 'INQ-' + Date.now();
+      await setDoc(doc(db, 'inquiries', inquiryId), {
+        ...formData,
+        id: inquiryId,
+        createdAt: new Date().toISOString()
+      }).catch(err => console.error('Firestore inquiry save error:', err));
+
+      // 2) API call
       const res = await fetch('/api/inquiry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

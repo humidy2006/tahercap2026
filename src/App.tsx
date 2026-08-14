@@ -40,7 +40,7 @@ export default function App() {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data && Array.isArray(data.items) && data.items.length > 0) {
+          if (data && Array.isArray(data.items)) {
             setProducts(data.items);
             localStorage.setItem('altaher_products', JSON.stringify(data.items));
             setIsCloudSynced(true);
@@ -62,8 +62,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Function to fetch latest products from server with cache-busting
+  // Function to fetch latest products from server with cache-busting (fallback if offline)
   const fetchLatestProducts = async () => {
+    if (isCloudSynced) return;
     try {
       const res = await fetch(`/api/products?_t=${Date.now()}`);
       if (res.ok) {
@@ -524,6 +525,7 @@ export default function App() {
         onResetProducts={handleResetProducts}
         language={language}
         currency={currency}
+        isCloudSynced={isCloudSynced}
       />
 
       {/* Admin Access Denied Alert Modal */}

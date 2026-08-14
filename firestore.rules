@@ -10,6 +10,11 @@ service cloud.firestore {
     match /inquiries/{inquiryId} {
       allow read, write: if true;
     }
+
+    // Customer orders
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
     
     // Default fallback
     match /{document=**} {

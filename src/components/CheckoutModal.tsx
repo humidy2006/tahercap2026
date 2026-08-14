@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, CheckCircle2, CreditCard, Banknote, Smartphone, Truck, FileText } from 'lucide-react';
 import { CartItem, Language, Currency, Order, User } from '../types';
 import { formatPrice } from '../utils/currency';
+import { db, doc, setDoc } from '../lib/firebase';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -65,7 +66,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setLoading(true);
 
     try {
-      const orderPayload = {
+      const orderId = 'ATG-ORD-' + Math.floor(100000 + Math.random() * 900000);
+      const orderPayload: Order = {
+        id: orderId,
+        date: new Date().toLocaleDateString('en-GB'),
         customerName,
         phone,
         email,
@@ -78,9 +82,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         shippingFee,
         total: grandTotal,
         currency,
-        paymentMethod
+        paymentMethod,
+        paymentStatus: paymentMethod === 'Cash on Delivery (COD)' ? 'Pending' : 'Paid',
+        orderStatus: 'Processing',
+        transactionId: 'TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase()
       };
 
+      // 1) Write directly to Cloud Firestore
+      await setDoc(doc(db, 'orders', orderId), orderPayload)
+        .catch(err => console.error('Firestore order save error:', err));
+
+      // 2) Write to Express backend
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,12 +100,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.order) {
         onOrderCompleted(data.order);
+      } else {
+        onOrderCompleted(orderPayload);
       }
     } catch (err) {
       console.error(err);
-      // Fallback local order creation
       const localOrder: Order = {
         id: 'ATG-ORD-' + Math.floor(100000 + Math.random() * 900000),
         date: new Date().toLocaleDateString('en-GB'),
