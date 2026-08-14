@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Products catalog: readable and writable by everyone (so all users get real-time product updates)
+    match /catalog/{document=**} {
+      allow read, write: if true;
+    }
+    
+    // Wholesale inquiries: public submission
+    match /inquiries/{inquiryId} {
+      allow read, write: if true;
+    }
+    
+    // Default fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Product, CartItem, CustomTupiDesign, Language, Currency, Order, User } from './types';
 import { INITIAL_PRODUCTS } from './data/products';
+import { db, doc, onSnapshot, setDoc, getDoc } from './lib/firebase';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { ProductCatalog } from './components/ProductCatalog';
@@ -25,8 +26,41 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('shop');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Products Database State with Server Sync & Local Persistence
+  // Products Database State with Cloud Firestore & Server Sync
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
+
+  // 1. Primary Live Sync: Cloud Firestore Real-Time Listener (Instant all-device & all-user sync)
+  useEffect(() => {
+    const catalogDocRef = doc(db, 'catalog', 'main_products');
+
+    // Subscribe to real-time changes from Firestore
+    const unsubscribe = onSnapshot(
+      catalogDocRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.items) && data.items.length > 0) {
+            setProducts(data.items);
+            localStorage.setItem('altaher_products', JSON.stringify(data.items));
+            setIsCloudSynced(true);
+          }
+        } else {
+          // If Firestore is empty initially, seed it with INITIAL_PRODUCTS
+          setDoc(catalogDocRef, {
+            items: INITIAL_PRODUCTS,
+            updatedAt: Date.now(),
+            seeded: true
+          }).catch(err => console.error('Error seeding Firestore catalog:', err));
+        }
+      },
+      (error) => {
+        console.error('Firestore listener error, falling back to REST/SSE:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   // Function to fetch latest products from server with cache-busting
   const fetchLatestProducts = async () => {
@@ -34,7 +68,7 @@ export default function App() {
       const res = await fetch(`/api/products?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
-        if (data && Array.isArray(data.products)) {
+        if (data && Array.isArray(data.products) && data.products.length > 0) {
           setProducts(prev => {
             if (JSON.stringify(prev) !== JSON.stringify(data.products)) {
               localStorage.setItem('altaher_products', JSON.stringify(data.products));
@@ -49,7 +83,7 @@ export default function App() {
     }
   };
 
-  // 1. Initial Load: Fetch from server immediately (fallback to localStorage if offline)
+  // 2. Initial Load & Multi-tab fallback
   useEffect(() => {
     const saved = localStorage.getItem('altaher_products');
     if (saved) {
@@ -65,7 +99,7 @@ export default function App() {
     fetchLatestProducts();
   }, []);
 
-  // 2. Real-Time Server-Sent Events (SSE): Instant live push updates for all users & devices
+  // 3. Real-Time Server-Sent Events (SSE) as secondary fast push
   useEffect(() => {
     let eventSource: EventSource | null = null;
     let reconnectTimeout: any = null;
@@ -77,7 +111,7 @@ export default function App() {
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data && Array.isArray(data.products)) {
+            if (data && Array.isArray(data.products) && data.products.length > 0) {
               setProducts(prev => {
                 if (JSON.stringify(prev) !== JSON.stringify(data.products)) {
                   localStorage.setItem('altaher_products', JSON.stringify(data.products));
@@ -96,7 +130,6 @@ export default function App() {
             eventSource.close();
             eventSource = null;
           }
-          // Reconnect after 3 seconds if connection drops
           reconnectTimeout = setTimeout(connectSSE, 3000);
         };
       } catch (err) {
@@ -116,45 +149,7 @@ export default function App() {
     };
   }, []);
 
-  // 3. Fallback Auto Polling (every 3s) & Window Focus Sync
-  useEffect(() => {
-    const interval = setInterval(fetchLatestProducts, 3000);
-
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible') {
-        fetchLatestProducts();
-      }
-    };
-
-    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    window.addEventListener('focus', handleVisibilityOrFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-    };
-  }, []);
-
-  // 4. Multi-tab Sync in the same browser via storage event
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'altaher_products' && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed)) {
-            setProducts(parsed);
-          }
-        } catch (err) {
-          console.error('Failed to parse updated products from storage event:', err);
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  // Save products to LocalStorage & Express backend server (syncs instantly for all other users)
+  // 4. Save products to Cloud Firestore, LocalStorage & Server (Syncs universally across all environments)
   const saveAndSyncProducts = async (newProducts: Product[]) => {
     setProducts(newProducts);
     try {
@@ -163,19 +158,26 @@ export default function App() {
       console.error('Failed to save products to localStorage:', e);
     }
 
+    // 1) Write to Cloud Firestore (Instant propagation to all users on any link/device)
     try {
-      const res = await fetch('/api/products', {
+      const catalogDocRef = doc(db, 'catalog', 'main_products');
+      await setDoc(catalogDocRef, {
+        items: newProducts,
+        updatedAt: Date.now(),
+        updatedBy: currentUser?.email || 'admin@altahercap.com'
+      });
+      setIsCloudSynced(true);
+    } catch (err) {
+      console.error('Failed to update Firestore database:', err);
+    }
+
+    // 2) Write to Express API backend
+    try {
+      await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ products: newProducts })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.products)) {
-          setProducts(data.products);
-          localStorage.setItem('altaher_products', JSON.stringify(data.products));
-        }
-      }
     } catch (e) {
       console.error('Failed to sync products with backend server:', e);
     }
@@ -309,26 +311,14 @@ export default function App() {
     setCartItems(prev => prev.filter(item => item.id !== cartItemId));
   };
 
-  // Admin Actions with Instant Server Sync & Real-Time Broadcast
+  // Admin Actions with Instant Server Sync & Real-Time Cloud Broadcast
   const handleAddProduct = async (newProduct: Product) => {
     const updated = [newProduct, ...products];
-    setProducts(updated);
-    try {
-      localStorage.setItem('altaher_products', JSON.stringify(updated));
-      await fetch('/api/products/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProduct)
-      });
-    } catch (e) {
-      console.error('Failed to add product on server:', e);
-      saveAndSyncProducts(updated);
-    }
+    await saveAndSyncProducts(updated);
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
     const updated = products.map(p => (p.id === updatedProduct.id ? updatedProduct : p));
-    setProducts(updated);
 
     // Update quick view modal if actively open
     if (quickViewProduct && quickViewProduct.id === updatedProduct.id) {
@@ -344,51 +334,22 @@ export default function App() {
       )
     );
 
-    try {
-      localStorage.setItem('altaher_products', JSON.stringify(updated));
-      await fetch(`/api/products/${encodeURIComponent(updatedProduct.id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedProduct)
-      });
-    } catch (e) {
-      console.error('Failed to update product on server:', e);
-      saveAndSyncProducts(updated);
-    }
+    await saveAndSyncProducts(updated);
   };
 
   const handleDeleteProduct = async (productId: string) => {
     const updated = products.filter(p => p.id !== productId);
-    setProducts(updated);
 
     if (quickViewProduct && quickViewProduct.id === productId) {
       setQuickViewProduct(null);
     }
 
     setCartItems(prev => prev.filter(item => item.product.id !== productId));
-
-    try {
-      localStorage.setItem('altaher_products', JSON.stringify(updated));
-      await fetch(`/api/products/${encodeURIComponent(productId)}`, {
-        method: 'DELETE'
-      });
-    } catch (e) {
-      console.error('Failed to delete product on server:', e);
-      saveAndSyncProducts(updated);
-    }
+    await saveAndSyncProducts(updated);
   };
 
   const handleResetProducts = async () => {
-    try {
-      const res = await fetch('/api/products/reset', { method: 'POST' });
-      const data = await res.json();
-      if (data && Array.isArray(data.products)) {
-        setProducts(data.products);
-        localStorage.setItem('altaher_products', JSON.stringify(data.products));
-      }
-    } catch (e) {
-      saveAndSyncProducts(INITIAL_PRODUCTS);
-    }
+    await saveAndSyncProducts(INITIAL_PRODUCTS);
   };
 
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);

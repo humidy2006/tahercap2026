@@ -1,0 +1,33 @@
+{
+  "entities": {
+    "productsCatalog": {
+      "title": "Products Catalog",
+      "description": "Global prayer cap inventory synced in real-time across all users and devices",
+      "fields": {
+        "items": {
+          "type": "array",
+          "description": "List of all product items"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Timestamp of last modification"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Admin who updated the catalog"
+        }
+      }
+    },
+    "inquiries": {
+      "title": "Wholesale Inquiries",
+      "description": "B2B buyer quotes and order inquiries",
+      "fields": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "country": { "type": "string" },
+        "quantity": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    }
+  }
+}
