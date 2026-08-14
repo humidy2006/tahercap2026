@@ -237,6 +237,18 @@ let productsDatabase: any[] = loadProducts();
 let productsLastUpdated: number = Date.now();
 let ordersDatabase: any[] = loadOrders();
 let inquiriesDatabase: any[] = loadInquiries();
+
+// Initialize files on disk if they don't exist
+if (!fs.existsSync(PRODUCTS_FILE)) {
+  saveProducts(productsDatabase);
+}
+if (!fs.existsSync(ORDERS_FILE)) {
+  saveOrders(ordersDatabase);
+}
+if (!fs.existsSync(INQUIRIES_FILE)) {
+  saveInquiries(inquiriesDatabase);
+}
+
 const sseClients = new Set<express.Response>();
 
 // Broadcast changes to all connected users in real-time
@@ -311,6 +323,9 @@ app.get('/sitemap.xml', (req, res) => {
 
 // API Route: Get Products (Public for all visitors)
 app.get('/api/products', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   return res.json({ 
     products: productsDatabase,
     updatedAt: productsLastUpdated,

@@ -28,13 +28,13 @@ export default function App() {
   // Products Database State with Server Sync & Local Persistence
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
 
-  // Function to fetch latest products from server
+  // Function to fetch latest products from server with cache-busting
   const fetchLatestProducts = async () => {
     try {
-      const res = await fetch('/api/products');
+      const res = await fetch(`/api/products?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.products && Array.isArray(data.products)) {
+        if (data && Array.isArray(data.products)) {
           setProducts(prev => {
             if (JSON.stringify(prev) !== JSON.stringify(data.products)) {
               localStorage.setItem('altaher_products', JSON.stringify(data.products));
@@ -96,8 +96,8 @@ export default function App() {
             eventSource.close();
             eventSource = null;
           }
-          // Reconnect after 4 seconds if connection drops
-          reconnectTimeout = setTimeout(connectSSE, 4000);
+          // Reconnect after 3 seconds if connection drops
+          reconnectTimeout = setTimeout(connectSSE, 3000);
         };
       } catch (err) {
         console.log('SSE connection setup:', err);
@@ -116,9 +116,9 @@ export default function App() {
     };
   }, []);
 
-  // 3. Fallback Auto Polling (every 3.5s) & Window Focus Sync
+  // 3. Fallback Auto Polling (every 3s) & Window Focus Sync
   useEffect(() => {
-    const interval = setInterval(fetchLatestProducts, 3500);
+    const interval = setInterval(fetchLatestProducts, 3000);
 
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
@@ -164,11 +164,18 @@ export default function App() {
     }
 
     try {
-      await fetch('/api/products', {
+      const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ products: newProducts })
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.products)) {
+          setProducts(data.products);
+          localStorage.setItem('altaher_products', JSON.stringify(data.products));
+        }
+      }
     } catch (e) {
       console.error('Failed to sync products with backend server:', e);
     }
