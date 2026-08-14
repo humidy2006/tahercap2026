@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as ImageIcon, Save, Check, Upload, FolderOpen, Camera } from 'lucide-react';
+import { Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as ImageIcon, Save, Check, Upload, FolderOpen, Camera, Images, Star } from 'lucide-react';
 import { Product, WholesaleInquiry, Order, Language, Currency } from '../types';
 import { formatPrice } from '../utils/currency';
 import { IMAGES } from '../data/images';
@@ -90,27 +90,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Handle File Upload from Computer for New Product
-  const handleFileUploadForNew = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    processImageFile(file, (imgUrl) => {
-      setNewImage(imgUrl);
-      showToast(isBn ? 'কম্পিউটার বা ডিভাইস থেকে ছবি লোড হয়েছে!' : 'Photo uploaded successfully from device!');
+  // Handle Multiple File Upload from Computer for New Product
+  const handleMultipleFileUploadForNew = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file: File) => {
+      processImageFile(file, (imgUrl) => {
+        setNewImages((prev) => {
+          const updated = [...prev, imgUrl];
+          if (!newImage) setNewImage(imgUrl);
+          return updated;
+        });
+      });
     });
+    showToast(isBn ? `${files.length}টি ছবি লোড হয়েছে!` : `${files.length} photo(s) uploaded successfully!`);
+    e.target.value = '';
   };
 
-  // Handle File Upload from Computer for Editing Product
-  const handleFileUploadForEdit = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editingProduct) return;
-    processImageFile(file, (imgUrl) => {
-      setEditingProduct({
-        ...editingProduct,
-        image: imgUrl
+  // Handle Multiple File Upload from Computer for Editing Product
+  const handleMultipleFileUploadForEdit = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !editingProduct) return;
+
+    Array.from(files).forEach((file: File) => {
+      processImageFile(file, (imgUrl) => {
+        setEditingProduct((prev) => {
+          if (!prev) return prev;
+          const currentList = prev.images && prev.images.length > 0 ? [...prev.images] : [prev.image];
+          const updatedList = [...currentList, imgUrl];
+          return {
+            ...prev,
+            images: updatedList,
+            image: prev.image || imgUrl
+          };
+        });
       });
-      showToast(isBn ? 'নতুন ছবি সফলভাবে যুক্ত হয়েছে!' : 'New product photo applied!');
     });
+    showToast(isBn ? `${files.length}টি নতুন ছবি যুক্ত হয়েছে!` : `${files.length} photo(s) added!`);
+    e.target.value = '';
   };
 
   // Quick Direct Row Image Upload
@@ -122,14 +140,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!file || !selectedProductForQuickImage) return;
 
     processImageFile(file, (imgUrl) => {
+      const currentList = selectedProductForQuickImage.images || [selectedProductForQuickImage.image];
       const updated = {
         ...selectedProductForQuickImage,
-        image: imgUrl
+        image: imgUrl,
+        images: [imgUrl, ...currentList.filter(u => u !== imgUrl)]
       };
       onUpdateProduct(updated);
       setSelectedProductForQuickImage(null);
-      showToast(isBn ? `"${updated.title}" এর নতুন ছবি আপডেট হয়েছে!` : `Updated photo for "${updated.title}"!`);
+      showToast(isBn ? `"${updated.designNumber}" এর নতুন ছবি আপডেট হয়েছে!` : `Updated photo for "${updated.designNumber}"!`);
     });
+    e.target.value = '';
   };
 
   // Inline Quick Price Editing State
@@ -148,6 +169,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newQuantity, setNewQuantity] = useState('1 Pc');
   const [newSizesText, setNewSizesText] = useState('48 cm, 50 cm, 52 cm, 54 cm, 56 cm');
   const [newImage, setNewImage] = useState(IMAGES.omaniTupi);
+  const [newImages, setNewImages] = useState<string[]>([IMAGES.omaniTupi]);
+  const [customImageUrlInput, setCustomImageUrlInput] = useState<string>('');
 
   useEffect(() => {
     fetchInquiriesAndOrders();
@@ -190,9 +213,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.preventDefault();
     if (!editingProduct) return;
 
-    onUpdateProduct(editingProduct);
+    const gallery = editingProduct.images && editingProduct.images.length > 0 
+      ? editingProduct.images 
+      : [editingProduct.image];
+
+    const updated: Product = {
+      ...editingProduct,
+      image: gallery[0] || editingProduct.image,
+      images: gallery
+    };
+
+    onUpdateProduct(updated);
     setEditingProduct(null);
-    showToast(isBn ? 'পন্যের তথ্য সফলভাবে আপডেট হয়েছে!' : 'Product updated successfully!');
+    showToast(isBn ? 'পন্য ও ছবির গ্যালারি সফলভাবে আপডেট হয়েছে!' : 'Product & photo gallery updated successfully!');
   };
 
   // Create New Product
@@ -203,6 +236,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ? newSizesText.split(',').map(s => s.trim()).filter(Boolean)
       : ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm'];
 
+    const finalGallery = newImages.length > 0 ? newImages : [newImage];
+
     const createdProduct: Product = {
       id: 'atg-' + Date.now(),
       category: newCategory,
@@ -212,13 +247,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       originalPrice: Number(newOriginalPrice) || (Number(newPrice) ? Number(newPrice) + 200 : 700),
       quantity: newQuantity || '1 Pc',
       sizes: parsedSizes,
-      image: newImage,
+      image: finalGallery[0] || newImage,
+      images: finalGallery,
       isFeatured: true
     };
 
     onAddProduct(createdProduct);
     setShowAddModal(false);
-    showToast(isBn ? 'নতুন পন্য যুক্ত হয়েছে!' : 'New Product added!');
+    showToast(isBn ? 'নতুন পন্য ও ছবি সফলভাবে যুক্ত হয়েছে!' : 'New Product & gallery added!');
   };
 
   const sampleImages = [
@@ -231,8 +267,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-4xl w-full h-[650px] flex flex-col shadow-2xl border border-slate-200 relative my-8 animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] max-h-[750px] flex flex-col shadow-2xl border border-slate-200 relative my-2 sm:my-6 animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
         <div className="bg-slate-950 text-white p-4 flex items-center justify-between border-b border-slate-800">
@@ -337,7 +373,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <button
-                  onClick={() => setShowAddModal(true)}
+                  onClick={() => {
+                    setNewImages([IMAGES.omaniTupi]);
+                    setNewImage(IMAGES.omaniTupi);
+                    setShowAddModal(true);
+                  }}
                   className="flex items-center gap-1.5 bg-slate-950 hover:bg-black text-amber-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4" />
@@ -436,66 +476,146 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </p>
                     </div>
 
-                    <div className="md:col-span-2 space-y-2 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
-                      <label className="block font-bold text-slate-900 text-xs flex items-center justify-between">
-                        <span>{isBn ? 'টুপির ছবি আপলোড করুন (কম্পিউটার বা প্রিসেট থেকে)' : 'Product Photo (Computer Folder / Presets)'}</span>
-                        {newImage && <span className="text-[10px] text-emerald-700 font-bold">✓ {isBn ? 'ছবি রেডি' : 'Image Selected'}</span>}
-                      </label>
+                    <div className="md:col-span-2 space-y-3 bg-amber-50/50 p-4 rounded-xl border border-amber-200">
+                      <div className="flex items-center justify-between">
+                        <label className="block font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                          <Images className="w-4 h-4 text-amber-600" />
+                          <span>{isBn ? 'টুপির ছবি আপলোড (একাধিক ছবি যুক্ত করতে পারেন)' : 'Product Photos Gallery (Upload Multiple Photos)'}</span>
+                        </label>
+                        <span className="text-[11px] text-slate-700 bg-amber-200/70 font-bold px-2 py-0.5 rounded-md">
+                          {isBn ? `${newImages.length}টি ছবি যুক্ত আছে` : `${newImages.length} Photo(s) Attached`}
+                        </span>
+                      </div>
 
-                      <div className="flex flex-col sm:flex-row items-center gap-3">
-                        {/* Preview Box */}
-                        <div className="w-20 h-20 bg-white border-2 border-dashed border-slate-300 rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-xs relative">
-                          {newImage ? (
-                            <img src={newImage} alt="Preview" className="w-full h-full object-cover" />
-                          ) : (
-                            <ImageIcon className="w-8 h-8 text-slate-400" />
-                          )}
-                        </div>
+                      {/* Multi-Photo Thumbnails Grid */}
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 pt-1">
+                        {newImages.map((img, idx) => (
+                          <div 
+                            key={idx}
+                            className={`relative aspect-square rounded-xl overflow-hidden border-2 bg-white shadow-xs group ${
+                              idx === 0 ? 'border-amber-500 ring-2 ring-amber-400/40' : 'border-slate-200 hover:border-slate-400'
+                            }`}
+                          >
+                            <img src={img} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                            
+                            {/* Primary Cover Badge */}
+                            {idx === 0 ? (
+                              <span className="absolute top-1 left-1 bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow-xs">
+                                {isBn ? 'কভার ছবি' : 'Cover'}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Move to cover (first)
+                                  const reordered = [img, ...newImages.filter((_, i) => i !== idx)];
+                                  setNewImages(reordered);
+                                  setNewImage(img);
+                                }}
+                                className="absolute top-1 left-1 bg-slate-900/80 text-amber-300 hover:bg-slate-950 text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition shadow-xs"
+                                title={isBn ? 'প্রধান কভার ছবি বানান' : 'Set as main cover'}
+                              >
+                                ★ {isBn ? 'কভার' : 'Cover'}
+                              </button>
+                            )}
 
-                        <div className="flex-1 space-y-2 w-full">
-                          {/* File Input Button */}
-                          <div className="flex items-center gap-2">
-                            <label className="cursor-pointer bg-slate-950 hover:bg-black text-amber-300 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xs transition border border-amber-400/30">
-                              <Upload className="w-4 h-4 text-amber-400" />
-                              <span>{isBn ? 'কম্পিউটারের ফোল্ডার থেকে ছবি বেছে নিন' : 'Upload Photo from Computer Folder'}</span>
-                              <input 
-                                type="file" 
-                                accept="image/*" 
-                                onChange={handleFileUploadForNew}
-                                className="hidden" 
-                              />
-                            </label>
+                            {/* Delete Photo Button */}
+                            {newImages.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const filtered = newImages.filter((_, i) => i !== idx);
+                                  setNewImages(filtered);
+                                  if (newImage === img) setNewImage(filtered[0] || '');
+                                }}
+                                className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition shadow-xs"
+                                title={isBn ? 'মুছে ফেলুন' : 'Remove photo'}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
+                        ))}
 
-                          {/* Presets and URL Fallback */}
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-slate-500 font-medium">
-                              {isBn ? 'অথবা ওয়েবসাইট প্রিসেট থেকে ছবি বা অনলাইন লিংক দিন:' : 'Or pick from preset cap photos:'}
-                            </p>
-                            <div className="flex flex-wrap gap-1.5 mb-1">
-                              {sampleImages.map((s, idx) => (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={() => setNewImage(s.url)}
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
-                                    newImage === s.url ? 'bg-slate-950 text-amber-300 border-slate-900' : 'bg-white border-slate-200 text-slate-700'
-                                  }`}
-                                >
-                                  {s.label}
-                                </button>
-                              ))}
-                            </div>
-                            <input
-                              type="text"
-                              value={newImage}
-                              onChange={(e) => setNewImage(e.target.value)}
-                              placeholder="Online image URL (Optional)..."
-                              className="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-mono text-[10px]"
-                            />
-                          </div>
+                        {/* Upload More Box */}
+                        <label className="aspect-square rounded-xl border-2 border-dashed border-amber-400 bg-amber-100/50 hover:bg-amber-100 flex flex-col items-center justify-center cursor-pointer transition text-center p-2 group shadow-xs">
+                          <Plus className="w-6 h-6 text-amber-700 group-hover:scale-110 transition" />
+                          <span className="text-[10px] font-bold text-amber-900 mt-1">
+                            {isBn ? '+ আরো ছবি' : '+ Add Photos'}
+                          </span>
+                          <input 
+                            type="file" 
+                            multiple 
+                            accept="image/*" 
+                            onChange={handleMultipleFileUploadForNew}
+                            className="hidden" 
+                          />
+                        </label>
+                      </div>
+
+                      {/* Actions: Local Device Browse & Presets */}
+                      <div className="pt-2 border-t border-amber-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <label className="cursor-pointer bg-slate-950 hover:bg-black text-amber-300 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xs transition border border-amber-400/30">
+                          <Upload className="w-4 h-4 text-amber-400" />
+                          <span>{isBn ? 'একসাথে একাধিক ছবি সিলেক্ট করুন (Phone/PC)' : 'Select Multiple Photos (Device Folder)'}</span>
+                          <input 
+                            type="file" 
+                            multiple 
+                            accept="image/*" 
+                            onChange={handleMultipleFileUploadForNew}
+                            className="hidden" 
+                          />
+                        </label>
+
+                        <div className="flex items-center gap-1 w-full sm:w-auto">
+                          <input
+                            type="text"
+                            value={customImageUrlInput}
+                            onChange={(e) => setCustomImageUrlInput(e.target.value)}
+                            placeholder="Image URL link..."
+                            className="bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] flex-1 sm:w-48"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (customImageUrlInput.trim()) {
+                                setNewImages((prev) => [...prev, customImageUrlInput.trim()]);
+                                setCustomImageUrlInput('');
+                                showToast(isBn ? 'ছবির লিংক যুক্ত হয়েছে!' : 'Image URL added to gallery!');
+                              }
+                            }}
+                            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[10px] px-2.5 py-1.5 rounded-lg shrink-0 transition"
+                          >
+                            + {isBn ? 'যোগ' : 'Add'}
+                          </button>
                         </div>
                       </div>
+
+                      {/* Presets Row */}
+                      <div className="space-y-1 pt-1">
+                        <p className="text-[10px] text-slate-600 font-bold">
+                          {isBn ? 'ক্লিক করে প্রিসেট কোয়ালিটি ছবি যোগ করুন:' : 'Quickly add preset cap angles:'}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {sampleImages.map((s, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                if (!newImages.includes(s.url)) {
+                                  setNewImages((prev) => [...prev, s.url]);
+                                  showToast(isBn ? `"${s.label}" যোগ করা হয়েছে` : `Added "${s.label}"`);
+                                }
+                              }}
+                              className="px-2 py-1 rounded-md text-[10px] font-bold border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 transition flex items-center gap-1 shadow-xs"
+                            >
+                              <Plus className="w-2.5 h-2.5 text-amber-600" />
+                              <span>{s.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                     </div>
                   </div>
 
@@ -594,66 +714,174 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         {isBn ? 'কমা (,) দিয়ে সেমি সাইজ লিখুন। যেমন: 48 cm মানে সাইজ 48' : 'Separate with commas. e.g. 48 cm means Size 48.'}
                       </p>
                     </div>
-                    <div className="md:col-span-2 space-y-2 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
-                      <label className="block font-bold text-slate-900 text-xs flex items-center justify-between">
-                        <span>{isBn ? 'ছবি আপডেট করুন (কম্পিউটার বা প্রিসেট থেকে)' : 'Update Product Photo (Upload local file or pick presets)'}</span>
-                      </label>
+                    <div className="md:col-span-2 space-y-3 bg-amber-50/50 p-4 rounded-xl border border-amber-200">
+                      <div className="flex items-center justify-between">
+                        <label className="block font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                          <Images className="w-4 h-4 text-amber-600" />
+                          <span>{isBn ? 'টুপির ছবি গ্যালারি (একাধিক ছবি যুক্ত ও পরিবর্তন করুন)' : 'Product Photo Gallery (Multiple Photos)'}</span>
+                        </label>
+                        <span className="text-[11px] text-slate-700 bg-amber-200/70 font-bold px-2 py-0.5 rounded-md">
+                          {(() => {
+                            const count = (editingProduct.images && editingProduct.images.length > 0) 
+                              ? editingProduct.images.length 
+                              : (editingProduct.image ? 1 : 0);
+                            return isBn ? `${count}টি ছবি আছে` : `${count} Photo(s)`;
+                          })()}
+                        </span>
+                      </div>
 
-                      <div className="flex flex-col sm:flex-row items-center gap-3">
-                        <label className="relative w-20 h-20 bg-white border border-slate-300 rounded-xl overflow-hidden shrink-0 shadow-xs cursor-pointer group" title={isBn ? 'ছবি বদলাতে ক্লিক করুন' : 'Click to change photo'}>
-                          <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover group-hover:opacity-85 transition" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-amber-300">
-                            <Camera className="w-5 h-5" />
-                          </div>
+                      {/* Multi-Photo Thumbnails Grid for Editing */}
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 pt-1">
+                        {(() => {
+                          const gallery = (editingProduct.images && editingProduct.images.length > 0)
+                            ? editingProduct.images
+                            : (editingProduct.image ? [editingProduct.image] : []);
+                          
+                          return gallery.map((img, idx) => (
+                            <div 
+                              key={idx}
+                              className={`relative aspect-square rounded-xl overflow-hidden border-2 bg-white shadow-xs group ${
+                                idx === 0 ? 'border-amber-500 ring-2 ring-amber-400/40' : 'border-slate-200 hover:border-slate-400'
+                              }`}
+                            >
+                              <img src={img} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                              
+                              {/* Primary Cover Badge */}
+                              {idx === 0 ? (
+                                <span className="absolute top-1 left-1 bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow-xs">
+                                  {isBn ? 'কভার ছবি' : 'Cover'}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const reordered = [img, ...gallery.filter((_, i) => i !== idx)];
+                                    setEditingProduct({
+                                      ...editingProduct,
+                                      image: img,
+                                      images: reordered
+                                    });
+                                  }}
+                                  className="absolute top-1 left-1 bg-slate-900/80 text-amber-300 hover:bg-slate-950 text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition shadow-xs"
+                                  title={isBn ? 'প্রধান কভার ছবি বানান' : 'Set as cover'}
+                                >
+                                  ★ {isBn ? 'কভার' : 'Cover'}
+                                </button>
+                              )}
+
+                              {/* Delete Photo Button */}
+                              {gallery.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const filtered = gallery.filter((_, i) => i !== idx);
+                                    setEditingProduct({
+                                      ...editingProduct,
+                                      image: filtered[0] || '',
+                                      images: filtered
+                                    });
+                                  }}
+                                  className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition shadow-xs"
+                                  title={isBn ? 'মুছে ফেলুন' : 'Remove photo'}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ));
+                        })()}
+
+                        {/* Upload More Box */}
+                        <label className="aspect-square rounded-xl border-2 border-dashed border-amber-400 bg-amber-100/50 hover:bg-amber-100 flex flex-col items-center justify-center cursor-pointer transition text-center p-2 group shadow-xs">
+                          <Plus className="w-6 h-6 text-amber-700 group-hover:scale-110 transition" />
+                          <span className="text-[10px] font-bold text-amber-900 mt-1">
+                            {isBn ? '+ আরো ছবি' : '+ Add Photos'}
+                          </span>
                           <input 
                             type="file" 
+                            multiple 
                             accept="image/*" 
-                            onChange={handleFileUploadForEdit}
+                            onChange={handleMultipleFileUploadForEdit}
+                            className="hidden" 
+                          />
+                        </label>
+                      </div>
+
+                      {/* Actions: Local Device Browse & Presets */}
+                      <div className="pt-2 border-t border-amber-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <label className="cursor-pointer bg-slate-950 hover:bg-black text-amber-300 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xs transition border border-amber-400/30">
+                          <Upload className="w-4 h-4 text-amber-400" />
+                          <span>{isBn ? 'কম্পিউটার/ফোন থেকে আরো ছবি যোগ করুন' : 'Select More Photos (Device Folder)'}</span>
+                          <input 
+                            type="file" 
+                            multiple 
+                            accept="image/*" 
+                            onChange={handleMultipleFileUploadForEdit}
                             className="hidden" 
                           />
                         </label>
 
-                        <div className="flex-1 space-y-2 w-full">
-                          <label className="cursor-pointer bg-slate-950 hover:bg-black text-amber-300 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xs transition border border-amber-400/30 w-fit">
-                            <Upload className="w-4 h-4 text-amber-400" />
-                            <span>{isBn ? 'কম্পিউটার বা ফোন থেকে ছবি আপলোড করুন' : 'Browse Local Photo from Computer/Phone'}</span>
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              onChange={handleFileUploadForEdit}
-                              className="hidden" 
-                            />
-                          </label>
-
-                          {/* Presets and URL Fallback */}
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-slate-500 font-medium">
-                              {isBn ? 'অথবা ওয়েবসাইট প্রিসেট ছবি বেছে নিন:' : 'Or pick from preset photos:'}
-                            </p>
-                            <div className="flex flex-wrap gap-1.5 mb-1">
-                              {sampleImages.map((s, idx) => (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={() => setEditingProduct({ ...editingProduct, image: s.url })}
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
-                                    editingProduct.image === s.url ? 'bg-slate-950 text-amber-300 border-slate-900' : 'bg-white border-slate-200 text-slate-700'
-                                  }`}
-                                >
-                                  {s.label}
-                                </button>
-                              ))}
-                            </div>
-                            <input
-                              type="text"
-                              value={editingProduct.image}
-                              onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
-                              placeholder="Image URL or Data Path..."
-                              className="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-mono text-[10px]"
-                            />
-                          </div>
+                        <div className="flex items-center gap-1 w-full sm:w-auto">
+                          <input
+                            type="text"
+                            value={customImageUrlInput}
+                            onChange={(e) => setCustomImageUrlInput(e.target.value)}
+                            placeholder="Image URL link..."
+                            className="bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] flex-1 sm:w-48"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (customImageUrlInput.trim()) {
+                                const currentList = (editingProduct.images && editingProduct.images.length > 0)
+                                  ? editingProduct.images
+                                  : [editingProduct.image];
+                                setEditingProduct({
+                                  ...editingProduct,
+                                  images: [...currentList, customImageUrlInput.trim()]
+                                });
+                                setCustomImageUrlInput('');
+                                showToast(isBn ? 'ছবির লিংক যুক্ত হয়েছে!' : 'Image URL added!');
+                              }
+                            }}
+                            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[10px] px-2.5 py-1.5 rounded-lg shrink-0 transition"
+                          >
+                            + {isBn ? 'যোগ' : 'Add'}
+                          </button>
                         </div>
                       </div>
+
+                      {/* Presets Row */}
+                      <div className="space-y-1 pt-1">
+                        <p className="text-[10px] text-slate-600 font-bold">
+                          {isBn ? 'প্রিসেট টুপি ছবি যুক্ত করতে ক্লিক করুন:' : 'Add preset cap photos:'}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {sampleImages.map((s, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                const currentList = (editingProduct.images && editingProduct.images.length > 0)
+                                  ? editingProduct.images
+                                  : [editingProduct.image];
+                                if (!currentList.includes(s.url)) {
+                                  setEditingProduct({
+                                    ...editingProduct,
+                                    images: [...currentList, s.url]
+                                  });
+                                  showToast(isBn ? `"${s.label}" যোগ করা হয়েছে` : `Added "${s.label}"`);
+                                }
+                              }}
+                              className="px-2 py-1 rounded-md text-[10px] font-bold border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 transition flex items-center gap-1 shadow-xs"
+                            >
+                              <Plus className="w-2.5 h-2.5 text-amber-600" />
+                              <span>{s.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                     </div>
                   </div>
 
@@ -713,7 +941,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   activeQuickUploadRowRef.current?.click();
                                 }}
                                 className="relative w-12 h-12 group cursor-pointer shrink-0"
-                                title={isBn ? 'কম্পিউটার/ফোন থেকে ছবি বদলাতে এখানে ক্লিক করুন' : 'Click to change photo from local device'}
+                                title={isBn ? 'ছবি বদলাতে বা নতুন ছবি যুক্ত করতে ক্লিক করুন' : 'Click to change or add photos'}
                               >
                                 <img
                                   src={p.image}
@@ -723,6 +951,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
                                   <Camera className="w-4 h-4 text-amber-300" />
                                 </div>
+                                {p.images && p.images.length > 1 && (
+                                  <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-slate-950 font-black text-[9px] px-1 py-0.2 rounded-full border border-white shadow-xs">
+                                    +{p.images.length}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -797,7 +1030,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                           <td className="p-3 text-right space-x-2">
                             <button
-                              onClick={() => setEditingProduct(p)}
+                              onClick={() => setEditingProduct({
+                                ...p,
+                                images: p.images && p.images.length > 0 ? p.images : [p.image]
+                              })}
                               className="p-1.5 text-slate-600 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 rounded transition"
                               title="Full Edit"
                             >

@@ -13,6 +13,12 @@ export const INITIAL_PRODUCTS: Product[] = [
     sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm', '58 cm'],
     isFeatured: true,
     image: IMAGES.omaniTupi,
+    images: [
+      IMAGES.omaniTupi,
+      IMAGES.velvetTupi,
+      IMAGES.cottonTupi,
+      IMAGES.turkishCap
+    ],
   },
   {
     id: 'atg-002',
@@ -25,6 +31,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm'],
     isFeatured: true,
     image: IMAGES.velvetTupi,
+    images: [
+      IMAGES.velvetTupi,
+      IMAGES.omaniTupi,
+      IMAGES.pakistaniTupi
+    ],
   },
   {
     id: 'atg-003',
@@ -37,6 +48,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm', '58 cm'],
     isFeatured: true,
     image: IMAGES.cottonTupi,
+    images: [
+      IMAGES.cottonTupi,
+      IMAGES.omaniTupi,
+      IMAGES.turkishCap
+    ],
   },
   {
     id: 'atg-004',
@@ -49,6 +65,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm', '58 cm'],
     isFeatured: true,
     image: IMAGES.omaniTupi,
+    images: [
+      IMAGES.omaniTupi,
+      IMAGES.velvetTupi,
+      IMAGES.cottonTupi
+    ],
   },
   {
     id: 'atg-005',
@@ -61,6 +82,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     sizes: ['50 cm', '52 cm', '54 cm', '56 cm'],
     isFeatured: false,
     image: IMAGES.turkishCap,
+    images: [
+      IMAGES.turkishCap,
+      IMAGES.omaniTupi,
+      IMAGES.velvetTupi
+    ],
   },
   {
     id: 'atg-006',
@@ -73,6 +99,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm', '58 cm'],
     isFeatured: false,
     image: IMAGES.pakistaniTupi,
+    images: [
+      IMAGES.pakistaniTupi,
+      IMAGES.velvetTupi,
+      IMAGES.omaniTupi
+    ],
   },
   {
     id: 'atg-007',
@@ -85,6 +116,11 @@ export const INITIAL_PRODUCTS: Product[] = [
     sizes: ['44 cm', '46 cm', '48 cm', '50 cm'],
     isFeatured: false,
     image: IMAGES.kidsTupi,
+    images: [
+      IMAGES.kidsTupi,
+      IMAGES.cottonTupi,
+      IMAGES.omaniTupi
+    ],
   },
   {
     id: 'atg-008',
@@ -97,6 +133,12 @@ export const INITIAL_PRODUCTS: Product[] = [
     sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm'],
     isFeatured: true,
     image: IMAGES.hajjSet,
+    images: [
+      IMAGES.hajjSet,
+      IMAGES.omaniTupi,
+      IMAGES.velvetTupi,
+      IMAGES.cottonTupi
+    ],
   }
 ];
 

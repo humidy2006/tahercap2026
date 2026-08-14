@@ -11,6 +11,7 @@ export interface Product {
   quantity: string; // Price Quantity, e.g. "1 Pc", "1 Dozen (12 Pcs)", "10 Pcs"
   sizes: string[]; // size array in cm (e.g. ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm'])
   image: string;
+  images?: string[]; // Multiple photos gallery for slider in view details
   title?: string;
   titleBn?: string;
   description?: string;

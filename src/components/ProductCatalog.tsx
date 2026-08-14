@@ -28,7 +28,6 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<string>('featured');
-  const [selectedFabric, setSelectedFabric] = useState<string>('All');
 
   // Categories list
   const categories = [
@@ -48,29 +47,39 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     const matchCategory = selectedCategory === 'All' || product.category === selectedCategory;
 
     // Search query match
-    const queryLower = searchQuery.toLowerCase();
+    const queryLower = searchQuery.toLowerCase().trim();
+    const isGeneralCapQuery = 
+      queryLower === 'taher' || 
+      queryLower === 'taher cap' || 
+      queryLower === 'al taher' || 
+      queryLower === 'al taher cap' || 
+      queryLower === 'namaz topi' || 
+      queryLower === 'namaz cap' || 
+      queryLower === 'namaz tupi' ||
+      queryLower === 'topi' ||
+      queryLower === 'tupi' ||
+      queryLower === 'cap' ||
+      queryLower === 'টুপি' ||
+      queryLower === 'নামাজ টুপি' ||
+      queryLower === 'তাহের ক্যাপ' ||
+      queryLower === 'আল তাহের ক্যাপ';
+
     const matchSearch =
-      !searchQuery ||
-      product.title.toLowerCase().includes(queryLower) ||
-      product.titleBn.includes(searchQuery) ||
+      !queryLower ||
+      isGeneralCapQuery ||
       (product.designNumber && product.designNumber.toLowerCase().includes(queryLower)) ||
-      product.fabric.toLowerCase().includes(queryLower) ||
-      product.category.toLowerCase().includes(queryLower) ||
-      product.tags.some(t => t.toLowerCase().includes(queryLower));
+      (product.category && product.category.toLowerCase().includes(queryLower)) ||
+      (product.categoryBn && product.categoryBn.includes(searchQuery)) ||
+      (product.quantity && product.quantity.toLowerCase().includes(queryLower)) ||
+      (product.sizes && product.sizes.some(s => s.toLowerCase().includes(queryLower)));
 
-    // Fabric filter match
-    const matchFabric =
-      selectedFabric === 'All' ||
-      product.fabric.toLowerCase().includes(selectedFabric.toLowerCase());
-
-    return matchCategory && matchSearch && matchFabric;
+    return matchCategory && matchSearch;
   });
 
   // Sorting Logic
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     if (sortBy === 'price-low') return a.price - b.price;
     if (sortBy === 'price-high') return b.price - a.price;
-    if (sortBy === 'rating') return b.rating - a.rating;
     return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
   });
 
@@ -133,33 +142,25 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
         })}
       </div>
 
-      {/* Search & Fabric Filters Active Bar */}
-      {(searchQuery || selectedFabric !== 'All') && (
+      {/* Search Filter Active Bar */}
+      {searchQuery && (
         <div className="flex items-center justify-between bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-xl text-xs">
           <div className="flex items-center gap-2 text-amber-900">
-            <span className="font-bold">{isBn ? 'ফিল্টার চালু আছে:' : 'Active Filters:'}</span>
-            {searchQuery && (
-              <span className="bg-amber-200 px-2 py-0.5 rounded font-medium">
-                "{searchQuery}"
-              </span>
-            )}
-            {selectedFabric !== 'All' && (
-              <span className="bg-amber-200 px-2 py-0.5 rounded font-medium">
-                Fabric: {selectedFabric}
-              </span>
-            )}
+            <span className="font-bold">{isBn ? 'অনুসন্ধান ফিল্টার:' : 'Search Filter:'}</span>
+            <span className="bg-amber-200 px-2 py-0.5 rounded font-medium">
+              "{searchQuery}"
+            </span>
           </div>
 
           <button
             onClick={() => {
               setSearchQuery('');
-              setSelectedFabric('All');
               setSelectedCategory('All');
             }}
             className="flex items-center gap-1 text-rose-700 hover:text-rose-900 font-bold"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>{isBn ? 'রিসেট ফিল্টার' : 'Clear All'}</span>
+            <span>{isBn ? 'রিসেট' : 'Clear'}</span>
           </button>
         </div>
       )}
@@ -194,7 +195,6 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
             onClick={() => {
               setSearchQuery('');
               setSelectedCategory('All');
-              setSelectedFabric('All');
             }}
             className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-lg transition"
           >

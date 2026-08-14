@@ -25,36 +25,68 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('shop');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Products Database State with LocalStorage Persistence & Server Sync
-  const [products, setProducts] = useState<Product[]>(() => {
+  // Products Database State with Server Sync & Local Persistence
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+
+  // Function to fetch latest products from server
+  const fetchLatestProducts = async () => {
+    try {
+      const res = await fetch('/api/products');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+          setProducts(prev => {
+            // Only update state if products have actually changed to avoid unnecessary re-renders
+            if (JSON.stringify(prev) !== JSON.stringify(data.products)) {
+              localStorage.setItem('altaher_products', JSON.stringify(data.products));
+              return data.products;
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (e) {
+      console.log('Product sync check:', e);
+    }
+  };
+
+  // 1. Initial Load: Fetch from server immediately (fallback to localStorage if offline)
+  useEffect(() => {
     const saved = localStorage.getItem('altaher_products');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          setProducts(parsed);
         }
       } catch (e) {
-        console.error('Failed to parse saved products:', e);
+        console.error('Failed to parse local cached products:', e);
       }
     }
-    return INITIAL_PRODUCTS;
-  });
-
-  // Fetch products from server on initial load
-  useEffect(() => {
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => {
-        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
-          setProducts(data.products);
-          localStorage.setItem('altaher_products', JSON.stringify(data.products));
-        }
-      })
-      .catch(e => console.log('Using cached local products:', e));
+    fetchLatestProducts();
   }, []);
 
-  // Sync products across browser tabs
+  // 2. Real-Time Auto Polling & Focus Sync (every 6 seconds & when window becomes active)
+  useEffect(() => {
+    const interval = setInterval(fetchLatestProducts, 6000);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLatestProducts();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, []);
+
+  // 3. Multi-tab Sync in the same browser
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'altaher_products' && e.newValue) {
@@ -72,19 +104,24 @@ export default function App() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Save products to LocalStorage & Express backend server
-  const saveAndSyncProducts = (newProducts: Product[]) => {
+  // Save products to LocalStorage & Express backend server (syncs instantly for all other users)
+  const saveAndSyncProducts = async (newProducts: Product[]) => {
     setProducts(newProducts);
     try {
       localStorage.setItem('altaher_products', JSON.stringify(newProducts));
     } catch (e) {
       console.error('Failed to save products to localStorage:', e);
     }
-    fetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ products: newProducts })
-    }).catch(e => console.error('Failed to sync products with backend:', e));
+
+    try {
+      await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products: newProducts })
+      });
+    } catch (e) {
+      console.error('Failed to sync products with backend server:', e);
+    }
   };
 
   // User Authentication State with LocalStorage Persistence
