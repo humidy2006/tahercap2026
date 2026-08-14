@@ -47,90 +47,101 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Optimize and process uploaded image files (resize to web max 800px)
-  const processImageFile = (file: File, onSuccess: (base64Url: string) => void) => {
-    if (!file.type.startsWith('image/')) {
-      alert(isBn ? 'দয়া করে একটি সঠিক ছবি (JPG, PNG, WebP, GIF) ফাইল নির্বাচন করুন।' : 'Please select a valid image file (JPG, PNG, WebP, GIF).');
-      return;
-    }
+  // Optimize and process uploaded image files (resize to web max 640px for fast loading and database sync)
+  const processImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) {
+        alert(isBn ? 'দয়া করে একটি সঠিক ছবি (JPG, PNG, WebP) নির্বাচন করুন।' : 'Please select a valid image file (JPG, PNG, WebP).');
+        resolve('');
+        return;
+      }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const rawDataUrl = e.target?.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 800;
-        let width = img.width;
-        let height = img.height;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const rawDataUrl = e.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 640;
+          let width = img.width;
+          let height = img.height;
 
-        if (width > height) {
-          if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
           }
-        } else {
-          if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.85);
-          onSuccess(compressed);
-        } else {
-          onSuccess(rawDataUrl);
-        }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.75);
+            resolve(compressed);
+          } else {
+            resolve(rawDataUrl);
+          }
+        };
+        img.onerror = () => resolve(rawDataUrl);
+        img.src = rawDataUrl;
       };
-      img.onerror = () => onSuccess(rawDataUrl);
-      img.src = rawDataUrl;
-    };
-    reader.readAsDataURL(file);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
   };
 
   // Handle Multiple File Upload from Computer for New Product
-  const handleMultipleFileUploadForNew = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMultipleFileUploadForNew = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file: File) => {
-      processImageFile(file, (imgUrl) => {
-        setNewImages((prev) => {
-          const updated = [...prev, imgUrl];
-          if (!newImage) setNewImage(imgUrl);
-          return updated;
-        });
+    const fileArray: File[] = Array.from(files);
+    const results = await Promise.all(fileArray.map((f: File) => processImageFile(f)));
+    const validImages = results.filter(Boolean);
+
+    if (validImages.length > 0) {
+      setNewImages((prev) => {
+        // If current image list only has the initial placeholder, replace it completely
+        const isDefaultOnly = prev.length === 1 && prev[0] === IMAGES.omaniTupi;
+        const base = isDefaultOnly ? [] : prev;
+        const updated = [...base, ...validImages];
+        setNewImage(updated[0] || validImages[0]);
+        return updated;
       });
-    });
-    showToast(isBn ? `${files.length}টি ছবি লোড হয়েছে!` : `${files.length} photo(s) uploaded successfully!`);
+      showToast(isBn ? `${validImages.length}টি ছবি সফলভাবে লোড হয়েছে!` : `${validImages.length} photo(s) uploaded successfully!`);
+    }
     e.target.value = '';
   };
 
   // Handle Multiple File Upload from Computer for Editing Product
-  const handleMultipleFileUploadForEdit = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMultipleFileUploadForEdit = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !editingProduct) return;
 
-    Array.from(files).forEach((file: File) => {
-      processImageFile(file, (imgUrl) => {
-        setEditingProduct((prev) => {
-          if (!prev) return prev;
-          const currentList = prev.images && prev.images.length > 0 ? [...prev.images] : [prev.image];
-          const updatedList = [...currentList, imgUrl];
-          return {
-            ...prev,
-            images: updatedList,
-            image: prev.image || imgUrl
-          };
-        });
+    const fileArray: File[] = Array.from(files);
+    const results = await Promise.all(fileArray.map((f: File) => processImageFile(f)));
+    const validImages = results.filter(Boolean);
+
+    if (validImages.length > 0) {
+      setEditingProduct((prev) => {
+        if (!prev) return prev;
+        const currentList = Array.isArray(prev.images) && prev.images.length > 0 ? [...prev.images] : [prev.image];
+        const updatedList = [...currentList, ...validImages];
+        return {
+          ...prev,
+          images: updatedList,
+          image: prev.image || validImages[0]
+        };
       });
-    });
-    showToast(isBn ? `${files.length}টি নতুন ছবি যুক্ত হয়েছে!` : `${files.length} photo(s) added!`);
+      showToast(isBn ? `${validImages.length}টি নতুন ছবি যুক্ত হয়েছে!` : `${validImages.length} photo(s) added!`);
+    }
     e.target.value = '';
   };
 
@@ -138,21 +149,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const activeQuickUploadRowRef = useRef<HTMLInputElement | null>(null);
   const [selectedProductForQuickImage, setSelectedProductForQuickImage] = useState<Product | null>(null);
 
-  const handleFileUploadForQuickRow = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedProductForQuickImage) return;
+  const handleFileUploadForQuickRow = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !selectedProductForQuickImage) return;
 
-    processImageFile(file, (imgUrl) => {
-      const currentList = selectedProductForQuickImage.images || [selectedProductForQuickImage.image];
+    const fileArray: File[] = Array.from(files);
+    const results = await Promise.all(fileArray.map((f: File) => processImageFile(f)));
+    const validImages = results.filter(Boolean);
+
+    if (validImages.length > 0) {
+      const currentList = Array.isArray(selectedProductForQuickImage.images) && selectedProductForQuickImage.images.length > 0 
+        ? selectedProductForQuickImage.images 
+        : [selectedProductForQuickImage.image];
       const updated = {
         ...selectedProductForQuickImage,
-        image: imgUrl,
-        images: [imgUrl, ...currentList.filter(u => u !== imgUrl)]
+        image: validImages[0],
+        images: [...validImages, ...currentList.filter(u => !validImages.includes(u))]
       };
       onUpdateProduct(updated);
       setSelectedProductForQuickImage(null);
-      showToast(isBn ? `"${updated.designNumber}" এর নতুন ছবি আপডেট হয়েছে!` : `Updated photo for "${updated.designNumber}"!`);
-    });
+      showToast(isBn ? `"${updated.designNumber}" এ ${validImages.length}টি নতুন ছবি যুক্ত হয়েছে!` : `Added ${validImages.length} photo(s) to "${updated.designNumber}"!`);
+    }
     e.target.value = '';
   };
 
@@ -979,6 +996,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 type="file"
                 ref={activeQuickUploadRowRef}
                 onChange={handleFileUploadForQuickRow}
+                multiple
                 accept="image/*"
                 className="hidden"
               />
@@ -1123,6 +1141,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </div>
                             ) : (
                               <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingProduct({
+                                    ...p,
+                                    images: p.images && p.images.length > 0 ? p.images : [p.image]
+                                  })}
+                                  className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg transition flex items-center gap-1 text-[11px]"
+                                  title={isBn ? 'ছবি ও গ্যালারি পরিবর্তন করুন' : 'Manage Photos & Info'}
+                                >
+                                  <Images className="w-3.5 h-3.5 text-amber-700" />
+                                  <span>
+                                    {p.images && p.images.length > 1 ? `${p.images.length}টি ছবি` : (isBn ? 'ছবি' : 'Photos')}
+                                  </span>
+                                </button>
+
                                 <button
                                   onClick={() => setEditingProduct({
                                     ...p,

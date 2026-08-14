@@ -150,8 +150,36 @@ export default function App() {
     };
   }, []);
 
+  // Sanitize and ensure product gallery integrity
+  const sanitizeProducts = (list: Product[]): Product[] => {
+    return list.map(item => {
+      const rawGallery = Array.isArray(item.images) && item.images.length > 0
+        ? item.images
+        : (item.image ? [item.image] : []);
+      
+      const cleanGallery: string[] = [];
+      rawGallery.forEach(img => {
+        if (img && typeof img === 'string' && !cleanGallery.includes(img)) {
+          cleanGallery.push(img);
+        }
+      });
+
+      const primary = cleanGallery[0] || item.image || 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?auto=format&fit=crop&w=600&q=80';
+      if (!cleanGallery.includes(primary)) {
+        cleanGallery.unshift(primary);
+      }
+
+      return {
+        ...item,
+        image: primary,
+        images: cleanGallery
+      };
+    });
+  };
+
   // 4. Save products to Cloud Firestore, LocalStorage & Server (Syncs universally across all environments)
-  const saveAndSyncProducts = async (newProducts: Product[]) => {
+  const saveAndSyncProducts = async (rawProducts: Product[]) => {
+    const newProducts = sanitizeProducts(rawProducts);
     setProducts(newProducts);
     try {
       localStorage.setItem('altaher_products', JSON.stringify(newProducts));
