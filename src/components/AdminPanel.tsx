@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as ImageIcon, Save, Check, Upload, FolderOpen, Camera, Images, Star } from 'lucide-react';
+import { 
+  Settings, Plus, Edit2, Trash2, CheckCircle, RefreshCw, X, Image as ImageIcon, 
+  Save, Check, Upload, FolderOpen, Camera, Images, Star, Mail, Phone, MapPin, 
+  ExternalLink, MessageSquare, Send, CheckCircle2, Clock, Truck, AlertTriangle, 
+  Search, Filter, ShoppingBag, Bell
+} from 'lucide-react';
 import { Product, WholesaleInquiry, Order, Language, Currency } from '../types';
 import { formatPrice } from '../utils/currency';
 import { IMAGES } from '../data/images';
-import { db, collection, onSnapshot } from '../lib/firebase';
+import { db, collection, onSnapshot, doc, updateDoc, deleteDoc } from '../lib/firebase';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -36,6 +41,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [inquiries, setInquiries] = useState<WholesaleInquiry[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [, setLoading] = useState(false);
+  const [testEmailLoading, setTestEmailLoading] = useState(false);
+  const [orderStatusUpdatingId, setOrderStatusUpdatingId] = useState<string | null>(null);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
 
   // Success Message Alert
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -45,45 +55,82 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Optimize and process uploaded image files (resize to web max 640px for fast loading and database sync)
+  // Optimize and process uploaded image files (accepts all formats: JPG, PNG, WEBP, AVIF, HEIC, BMP, GIF, SVG, any size)
   const processImageFile = (file: File): Promise<string> => {
     return new Promise((resolve) => {
-      if (!file.type.startsWith('image/')) {
-        alert(isBn ? 'দয়া করে একটি সঠিক ছবি (JPG, PNG, WebP) নির্বাচন করুন।' : 'Please select a valid image file (JPG, PNG, WebP).');
+      const fileName = file.name.toLowerCase();
+      const isImageExtension = /\.(jpg|jpeg|png|webp|avif|bmp|gif|svg|heic|heif|jfif|pjpeg|pjp)$/i.test(fileName);
+      const isImageMime = file.type.startsWith('image/') || file.type === '';
+
+      if (!isImageMime && !isImageExtension) {
+        alert(isBn 
+          ? 'দয়া করে একটি সঠিক ছবির ফাইল (JPG, PNG, WebP, AVIF, BMP, GIF, SVG ইত্যাদি) নির্বাচন করুন।' 
+          : 'Please select a valid image file (JPG, PNG, WebP, AVIF, BMP, GIF, SVG, etc.).'
+        );
         resolve('');
+        return;
+      }
+
+      // If SVG, handle directly
+      if (file.type === 'image/svg+xml' || fileName.endsWith('.svg')) {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve((e.target?.result as string) || '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
         return;
       }
 
       const reader = new FileReader();
       reader.onload = (e) => {
         const rawDataUrl = e.target?.result as string;
+        if (!rawDataUrl) {
+          resolve('');
+          return;
+        }
+
         const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxDim = 640;
-          let width = img.width;
-          let height = img.height;
+          try {
+            const canvas = document.createElement('canvas');
+            const maxDim = 1000; // Crisp high-definition size for prayer caps
+            let width = img.width;
+            let height = img.height;
 
-          if (width > height) {
-            if (width > maxDim) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
+            if (width > height) {
+              if (width > maxDim) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              }
+            } else {
+              if (height > maxDim) {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
             }
-          } else {
-            if (height > maxDim) {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            const compressed = canvas.toDataURL('image/jpeg', 0.75);
-            resolve(compressed);
-          } else {
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(img, 0, 0, width, height);
+
+              // Try WebP first for optimal size/quality, fallback to JPEG
+              let compressed = '';
+              try {
+                compressed = canvas.toDataURL('image/webp', 0.82);
+                if (!compressed.startsWith('data:image/webp')) {
+                  compressed = canvas.toDataURL('image/jpeg', 0.80);
+                }
+              } catch {
+                compressed = canvas.toDataURL('image/jpeg', 0.80);
+              }
+              resolve(compressed || rawDataUrl);
+            } else {
+              resolve(rawDataUrl);
+            }
+          } catch {
             resolve(rawDataUrl);
           }
         };
@@ -247,6 +294,73 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Update Order Status
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: Order['orderStatus']) => {
+    setOrderStatusUpdatingId(orderId);
+    try {
+      // 1. Update Firestore
+      await updateDoc(doc(db, 'orders', orderId), { orderStatus: newStatus }).catch(() => {});
+
+      // 2. Update Backend Express DB
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderStatus: newStatus })
+      });
+      const data = await res.json();
+      if (data.orders) {
+        setOrders(data.orders);
+      } else {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, orderStatus: newStatus } : o));
+      }
+      showToast(isBn ? `অর্ডার #${orderId} এর স্ট্যাটাস '${newStatus}' করা হয়েছে` : `Order #${orderId} marked as ${newStatus}`);
+    } catch (err) {
+      console.error('Update order status error:', err);
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, orderStatus: newStatus } : o));
+    } finally {
+      setOrderStatusUpdatingId(null);
+    }
+  };
+
+  // Delete Order
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await deleteDoc(doc(db, 'orders', orderId)).catch(() => {});
+      const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.orders) {
+        setOrders(data.orders);
+      } else {
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+      }
+      setDeletingOrderId(null);
+      showToast(isBn ? `অর্ডার #${orderId} মুছে ফেলা হয়েছে` : `Order #${orderId} removed`);
+    } catch (err) {
+      console.error('Delete order error:', err);
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      setDeletingOrderId(null);
+    }
+  };
+
+  // Send Test Notification Email
+  const handleSendTestEmail = async () => {
+    setTestEmailLoading(true);
+    try {
+      const res = await fetch('/api/admin/test-email', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(isBn ? `📧 টেস্ট ইমেইল পাঠানো হয়েছে: ${data.recipient}` : `📧 Test email alert sent to: ${data.recipient}`);
+      } else {
+        showToast(isBn ? 'ইমেইল পাঠাতে সমস্যা হয়েছে' : 'Failed to dispatch test email');
+      }
+    } catch (err) {
+      console.error('Test email error:', err);
+      showToast('Error testing email notification');
+    } finally {
+      setTestEmailLoading(false);
     }
   };
 
@@ -997,27 +1111,103 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 ref={activeQuickUploadRowRef}
                 onChange={handleFileUploadForQuickRow}
                 multiple
-                accept="image/*"
+                accept="image/*,.jpg,.jpeg,.png,.webp,.avif,.bmp,.gif,.svg,.heic,.heif,.jfif"
                 className="hidden"
               />
 
+              {/* Product Search & Category Filter Toolbar */}
+              <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex flex-1 items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      placeholder={isBn ? 'ডিজাইন নং বা ক্যাটাগরি দিয়ে খুঁজুন...' : 'Search by Design No, Category or ID...'}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:bg-white transition"
+                    />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                    {productSearchQuery && (
+                      <button
+                        onClick={() => setProductSearchQuery('')}
+                        className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-semibold"
+                  >
+                    <option value="All">{isBn ? 'সব ক্যাটাগরি' : 'All Categories'}</option>
+                    <option value="Omani & Zari Series">Omani & Zari Series</option>
+                    <option value="Royal Velvet">Royal Velvet</option>
+                    <option value="Daily Comfort">Daily Comfort</option>
+                    <option value="Handcrafted Heritage">Handcrafted Heritage</option>
+                    <option value="Turkish Cut">Turkish Cut</option>
+                    <option value="Kid's Collection">Kid's Collection</option>
+                    <option value="Hajj & Umrah Package">Hajj & Umrah Package</option>
+                  </select>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                    {isBn ? `মোট টুপি: ${products.length}টি` : `Total Caps: ${products.length}`}
+                  </span>
+                </div>
+              </div>
+
               {/* Products Table with Quick Price Edit */}
               <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950 text-amber-300 font-bold uppercase">
-                    <tr>
-                      <th className="p-3">{isBn ? 'ছবি' : 'Cap Photo'}</th>
-                      <th className="p-3">{isBn ? 'ক্যাটাগরি' : 'Category'}</th>
-                      <th className="p-3">{isBn ? 'ডিজাইন নং' : 'Design No.'}</th>
-                      <th className="p-3">{isBn ? 'মূল্য (৳)' : 'Price (৳)'}</th>
-                      <th className="p-3">{isBn ? 'মূল্যের পরিমাণ' : 'Quantity Unit'}</th>
-                      <th className="p-3">{isBn ? 'সাইজ (cm)' : 'Sizes (cm)'}</th>
-                      <th className="p-3 text-right">{isBn ? 'অ্যাকশন' : 'Actions'}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-sans">
-                    {products.map((p) => {
-                      const isEditingPrice = editingPriceId === p.id;
+                {(() => {
+                  const filteredProducts = products.filter(p => {
+                    const matchesSearch = productSearchQuery.trim() === '' || 
+                      (p.designNumber && p.designNumber.toLowerCase().includes(productSearchQuery.toLowerCase())) ||
+                      (p.category && p.category.toLowerCase().includes(productSearchQuery.toLowerCase())) ||
+                      (p.id && p.id.toLowerCase().includes(productSearchQuery.toLowerCase()));
+                    const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
+                    return matchesSearch && matchesCategory;
+                  });
+
+                  if (filteredProducts.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-slate-500 space-y-2">
+                        <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
+                        <p className="font-bold text-xs">
+                          {isBn ? 'কোনো পণ্য পাওয়া যায়নি' : 'No products match your filter'}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setProductSearchQuery('');
+                            setCategoryFilter('All');
+                          }}
+                          className="text-xs text-amber-700 underline font-semibold"
+                        >
+                          {isBn ? 'ফিল্টার ক্লিয়ার করুন' : 'Clear filters'}
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-950 text-amber-300 font-bold uppercase">
+                        <tr>
+                          <th className="p-3">{isBn ? 'ছবি' : 'Cap Photo'}</th>
+                          <th className="p-3">{isBn ? 'ক্যাটাগরি' : 'Category'}</th>
+                          <th className="p-3">{isBn ? 'ডিজাইন নং' : 'Design No.'}</th>
+                          <th className="p-3">{isBn ? 'মূল্য (৳)' : 'Price (৳)'}</th>
+                          <th className="p-3">{isBn ? 'মূল্যের পরিমাণ' : 'Quantity Unit'}</th>
+                          <th className="p-3">{isBn ? 'সাইজ (cm)' : 'Sizes (cm)'}</th>
+                          <th className="p-3 text-right">{isBn ? 'অ্যাকশন' : 'Actions'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-sans">
+                        {filteredProducts.map((p) => {
+                          const isEditingPrice = editingPriceId === p.id;
 
                       return (
                         <tr key={p.id} className="hover:bg-slate-50">
@@ -1182,42 +1372,271 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     })}
                   </tbody>
                 </table>
-              </div>
+              );
+            })()}
+          </div>
             </div>
           )}
 
-          {/* TAB 2: CUSTOMER ORDERS */}
+          {/* TAB 2: CUSTOMER ORDERS WITH EMAIL NOTIFICATIONS */}
           {activeSubTab === 'orders' && (
-            <div className="space-y-4">
-              <h4 className="font-bold text-slate-900 text-sm">
-                {isBn ? 'সম্প্রতি আসা অনলাইন কাস্টমার অর্ডার' : 'Recent Online Customer Orders'}
-              </h4>
+            <div className="space-y-5">
+              {/* Notification Channel Banner */}
+              <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0">
+                    <Mail className="w-5 h-5 text-amber-700" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                      <span>{isBn ? 'অর্ডার নোটিফিকেশন ইমেইল' : 'Order Notification Channel'}:</span>
+                      <code className="bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-950 font-bold font-mono">
+                        abdullahalhumidy@gmail.com
+                      </code>
+                    </h5>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      {isBn 
+                        ? 'প্রতিটি নতুন অর্ডার প্লেস হলে স্বয়ংক্রিয়ভাবে বিস্তারিত ইমেইল পাঠানো হয় এবং নিচের ড্যাশবোর্ডে লাইভ শো করে।' 
+                        : 'Instant order alerts with customer details & items table are dispatched to your email and listed below.'}
+                    </p>
+                  </div>
+                </div>
 
+                <button
+                  type="button"
+                  onClick={handleSendTestEmail}
+                  disabled={testEmailLoading}
+                  className="bg-slate-950 hover:bg-black text-amber-300 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 shadow-xs transition shrink-0 disabled:opacity-50"
+                >
+                  <Send className={`w-3.5 h-3.5 ${testEmailLoading ? 'animate-spin' : ''}`} />
+                  <span>{testEmailLoading ? (isBn ? 'পাঠানো হচ্ছে...' : 'Sending...') : (isBn ? 'টেস্ট ইমেইল পাঠান' : 'Send Test Alert')}</span>
+                </button>
+              </div>
+
+              {/* Orders Header */}
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-amber-600" />
+                  <span>{isBn ? 'কাস্টমারদের সমস্ত অর্ডার' : 'All Customer Orders'} ({orders.length})</span>
+                </h4>
+
+                <button
+                  onClick={fetchInquiriesAndOrders}
+                  className="text-xs text-slate-600 hover:text-slate-950 flex items-center gap-1 font-semibold"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>{isBn ? 'রিফ্রেশ' : 'Refresh'}</span>
+                </button>
+              </div>
+
+              {/* Orders List */}
               {orders.length > 0 ? (
-                <div className="space-y-3">
-                  {orders.map((ord) => (
-                    <div key={ord.id} className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
-                      <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <span className="font-black font-mono text-slate-950">{ord.id}</span>
-                        <span className="bg-slate-100 text-slate-900 font-bold px-2 py-0.5 rounded">
-                          {ord.paymentStatus} • {ord.paymentMethod}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-slate-700">
-                        <div>
-                          <p className="font-bold text-slate-900">{ord.customerName} ({ord.phone})</p>
-                          <p className="text-[11px] text-slate-500">{ord.address}, {ord.city}</p>
+                <div className="space-y-4">
+                  {orders.map((ord) => {
+                    const isUpdating = orderStatusUpdatingId === ord.id;
+                    const isDeleting = deletingOrderId === ord.id;
+
+                    return (
+                      <div 
+                        key={ord.id} 
+                        className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 text-xs shadow-xs hover:border-slate-300 transition"
+                      >
+                        {/* Order Header Row */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-extrabold text-sm text-slate-950 bg-slate-100 px-2.5 py-1 rounded-lg">
+                              {ord.id}
+                            </span>
+                            <span className="text-slate-500 text-[11px] font-medium flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {ord.date}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* Email notification status tag */}
+                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold px-2.5 py-1 rounded-lg text-[10px] flex items-center gap-1">
+                              <Mail className="w-3 h-3 text-emerald-600" />
+                              <span>{isBn ? 'ইমেইল: abdullahalhumidy@gmail.com' : 'Email Sent to abdullahalhumidy@gmail.com'}</span>
+                            </span>
+
+                            {/* Payment Status Pill */}
+                            <span className={`font-bold px-2.5 py-1 rounded-lg text-[10px] ${
+                              ord.paymentStatus === 'Paid' 
+                                ? 'bg-emerald-100 text-emerald-900' 
+                                : 'bg-amber-100 text-amber-900'
+                            }`}>
+                              {ord.paymentStatus} • {ord.paymentMethod}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-extrabold font-serif text-slate-950 text-sm">{formatPrice(ord.total, currency)}</p>
-                          <p className="text-[10px] text-slate-400">{ord.items.length} items</p>
+
+                        {/* Customer Info & Order Status Control */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                          {/* Customer Details */}
+                          <div className="space-y-1 md:col-span-2">
+                            <div className="font-bold text-slate-900 text-sm flex flex-wrap items-center gap-2">
+                              <span>{ord.customerName}</span>
+                              <span className="text-slate-400 text-xs font-normal">|</span>
+                              <a 
+                                href={`tel:${ord.phone}`} 
+                                className="text-amber-800 hover:text-amber-950 font-mono font-bold flex items-center gap-1 bg-amber-100/80 px-2 py-0.5 rounded text-[11px]"
+                                title="Click to call customer"
+                              >
+                                <Phone className="w-3 h-3 text-amber-700" />
+                                {ord.phone}
+                              </a>
+                              <a
+                                href={`https://wa.me/${ord.phone.replace(/[^0-9]/g, '')}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-0.5 bg-emerald-100/70 px-1.5 py-0.5 rounded text-[10px]"
+                                title="Chat on WhatsApp"
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                                WhatsApp
+                              </a>
+                            </div>
+
+                            <p className="text-slate-600 flex items-center gap-1.5 text-[11px] pt-1">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{ord.address}, {ord.district ? `${ord.district}, ` : ''}{ord.city}</span>
+                            </p>
+
+                            {ord.email && ord.email !== 'N/A' && (
+                              <p className="text-slate-500 text-[11px] pl-5">
+                                Customer Email: {ord.email}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Order Status Select & Quick Action */}
+                          <div className="flex flex-col justify-between items-start md:items-end gap-2 border-t md:border-t-0 md:border-l border-slate-200/80 pt-2 md:pt-0 md:pl-4">
+                            <div className="w-full md:w-auto">
+                              <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                                {isBn ? 'অর্ডার স্ট্যাটাস পরিবর্তন করুন:' : 'Update Order Status:'}
+                              </label>
+                              <select
+                                value={ord.orderStatus || 'Processing'}
+                                disabled={isUpdating}
+                                onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value as any)}
+                                className={`w-full md:w-auto text-xs font-bold rounded-lg px-2.5 py-1.5 border transition cursor-pointer ${
+                                  ord.orderStatus === 'Delivered'
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                    : ord.orderStatus === 'Shipped'
+                                    ? 'bg-blue-50 text-blue-900 border-blue-300'
+                                    : ord.orderStatus === 'Cancelled'
+                                    ? 'bg-rose-50 text-rose-900 border-rose-300'
+                                    : 'bg-amber-50 text-amber-950 border-amber-300'
+                                }`}
+                              >
+                                <option value="Processing">🟡 {isBn ? 'প্রসেসিং হচ্ছে' : 'Processing'}</option>
+                                <option value="Shipped">🚚 {isBn ? 'ডেলিভারিতে পাঠানো হয়েছে' : 'Shipped / In Transit'}</option>
+                                <option value="Delivered">✅ {isBn ? 'ডেলিভারি সম্পন্ন' : 'Delivered'}</option>
+                                <option value="Cancelled">❌ {isBn ? 'বাতিল' : 'Cancelled'}</option>
+                              </select>
+                            </div>
+
+                            {/* Delete Order Option */}
+                            {isDeleting ? (
+                              <div className="flex items-center gap-1 bg-rose-50 border border-rose-300 p-1 rounded-lg">
+                                <span className="text-[10px] font-bold text-rose-800">{isBn ? 'মুছবেন?' : 'Delete order?'}</span>
+                                <button
+                                  onClick={() => handleDeleteOrder(ord.id)}
+                                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] px-1.5 py-0.5 rounded"
+                                >
+                                  {isBn ? 'হ্যাঁ' : 'Yes'}
+                                </button>
+                                <button
+                                  onClick={() => setDeletingOrderId(null)}
+                                  className="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded"
+                                >
+                                  {isBn ? 'না' : 'No'}
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setDeletingOrderId(ord.id)}
+                                className="text-slate-400 hover:text-rose-600 text-[10px] font-semibold flex items-center gap-1 transition"
+                                title="Delete Order record"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>{isBn ? 'অর্ডার রেকর্ড মুছুন' : 'Remove Order'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Ordered Items Table */}
+                        <div className="border border-slate-100 rounded-xl overflow-hidden">
+                          <table className="w-full text-left text-[11px]">
+                            <thead className="bg-slate-100/80 font-bold text-slate-700">
+                              <tr>
+                                <th className="p-2.5">{isBn ? 'টুপি / ডিজাইন' : 'Product / Cap'}</th>
+                                <th className="p-2.5 text-center">{isBn ? 'সাইজ' : 'Size'}</th>
+                                <th className="p-2.5 text-center">{isBn ? 'পরিমাণ' : 'Quantity'}</th>
+                                <th className="p-2.5 text-right">{isBn ? 'একক মূল্য' : 'Unit Price'}</th>
+                                <th className="p-2.5 text-right">{isBn ? 'মোট' : 'Subtotal'}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {ord.items && ord.items.map((item, idx) => {
+                                const title = item.product?.designNumber || item.product?.title || `Item #${idx + 1}`;
+                                const price = item.product?.price || 0;
+                                const subtotal = price * item.quantity;
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50/50">
+                                    <td className="p-2.5 font-bold text-slate-900 flex items-center gap-2">
+                                      <img 
+                                        src={item.product?.image || IMAGES.omaniTupi} 
+                                        alt={title} 
+                                        className="w-7 h-7 rounded object-cover border border-slate-200"
+                                      />
+                                      <div>
+                                        <p>{title}</p>
+                                        <p className="text-[10px] text-slate-500 font-normal">{item.product?.category}</p>
+                                      </div>
+                                    </td>
+                                    <td className="p-2.5 text-center font-mono font-semibold text-slate-700">
+                                      {item.selectedSize || 'Standard'}
+                                    </td>
+                                    <td className="p-2.5 text-center font-extrabold text-slate-900">
+                                      {item.quantity}
+                                    </td>
+                                    <td className="p-2.5 text-right font-medium text-slate-600">
+                                      ৳{price}
+                                    </td>
+                                    <td className="p-2.5 text-right font-bold text-slate-900 font-mono">
+                                      ৳{subtotal}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot className="bg-slate-50/80 border-t border-slate-200 font-bold">
+                              <tr>
+                                <td colSpan={4} className="p-2.5 text-right text-slate-700">
+                                  {isBn ? 'সর্বমোট মূল্য (Grand Total):' : 'Grand Total:'}
+                                </td>
+                                <td className="p-2.5 text-right text-amber-900 font-serif font-black text-sm">
+                                  {formatPrice(ord.total, currency)}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-xs text-slate-500 italic p-6 text-center">No orders recorded yet.</p>
+                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                  <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="text-xs text-slate-600 font-bold">{isBn ? 'এখনও কোনো কাস্টমার অর্ডার নেই' : 'No online customer orders yet'}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {isBn ? 'ওয়েবসাইটে কাস্টমার অর্ডার করার সাথে সাথে এখানে প্রদর্শিত হবে এবং আপনার ইমেইলে নোটিফিকেশন যাবে।' : 'Orders placed on the website will appear here in real-time.'}
+                  </p>
+                </div>
               )}
             </div>
           )}

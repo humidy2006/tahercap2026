@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -510,9 +511,178 @@ app.get('/api/inquiries', (req, res) => {
   return res.json({ inquiries: inquiriesDatabase });
 });
 
-// API Route: Submit Order
-app.post('/api/orders', (req, res) => {
-  const { customerName, phone, email, address, city, district, country, items, total, paymentMethod, currency } = req.body;
+// Helper: Dispatch Order Notification Email to abdullahalhumidy@gmail.com
+async function sendOrderNotificationEmail(order: any) {
+  const targetEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'abdullahalhumidy@gmail.com';
+  
+  // Format items HTML table
+  const itemsRowsHtml = (order.items || []).map((item: any, idx: number) => {
+    const title = item.product?.designNumber || item.product?.title || `Item #${idx + 1}`;
+    const category = item.product?.category || 'Islamic Prayer Cap';
+    const size = item.selectedSize || 'Standard';
+    const qty = item.quantity || 1;
+    const price = item.product?.price || 0;
+    const subtotal = price * qty;
+    const customInfo = item.isCustomItem && item.customDetails
+      ? `<br/><small style="color: #64748b;">Fabric: ${item.customDetails.fabric}, Style: ${item.customDetails.baseStyle}, Text: ${item.customDetails.customText || 'N/A'}</small>`
+      : '';
+    return `
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px 12px; font-weight: 600; color: #1e293b;">${title} (${category})${customInfo}</td>
+        <td style="padding: 10px 12px; text-align: center; color: #475569;">${size}</td>
+        <td style="padding: 10px 12px; text-align: center; color: #475569;">${qty}</td>
+        <td style="padding: 10px 12px; text-align: right; color: #475569;">৳ ${price}</td>
+        <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #0f172a;">৳ ${subtotal}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const itemsText = (order.items || []).map((item: any, idx: number) => {
+    const title = item.product?.designNumber || item.product?.title || `Item #${idx + 1}`;
+    const size = item.selectedSize || 'Standard';
+    const qty = item.quantity || 1;
+    const price = item.product?.price || 0;
+    return `• ${title} | Size: ${size} | Qty: ${qty} | Unit: ৳${price} | Total: ৳${price * qty}`;
+  }).join('\n');
+
+  const emailSubject = `🔔 [New Order Alert] Al Taher Cap - Order #${order.id} - ${order.customerName} (৳${order.total})`;
+
+  const emailHtml = `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0f172a; color: #ffffff; padding: 24px; text-align: center;">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; color: #f59e0b;">AL TAHER CAP GARMENTS</h1>
+        <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">আল তাহের ক্যাপ গার্মেন্টস — নতুন কাস্টমার অর্ডার নোটিফিকেশন</p>
+      </div>
+
+      <div style="padding: 24px;">
+        <div style="background: #f8fafc; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
+          <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">নতুন অর্ডার পাওয়া গেছে! (Order ID: ${order.id})</h2>
+          <p style="margin: 0; font-size: 13px; color: #475569;">অর্ডার এর তারিখ: <strong>${order.date || new Date().toLocaleDateString('en-GB')}</strong> | পেমেন্ট মেথড: <strong>${order.paymentMethod}</strong></p>
+        </div>
+
+        <h3 style="font-size: 15px; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-top: 24px;">👤 ক্রেতার তথ্য (Customer Details)</h3>
+        <table style="width: 100%; font-size: 14px; color: #334155; margin-bottom: 20px;">
+          <tr>
+            <td style="padding: 6px 0; width: 130px; font-weight: 600; color: #64748b;">নাম (Name):</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${order.customerName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; font-weight: 600; color: #64748b;">ফোন নাম্বার:</td>
+            <td style="padding: 6px 0;"><a href="tel:${order.phone}" style="color: #0284c7; text-decoration: none; font-weight: 600;">${order.phone}</a> (Click to Call)</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; font-weight: 600; color: #64748b;">ইমেইল:</td>
+            <td style="padding: 6px 0;">${order.email || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; font-weight: 600; color: #64748b;">ডেলিভারি ঠিকানা:</td>
+            <td style="padding: 6px 0; color: #0f172a;">${order.address}, ${order.district || ''}, ${order.city || ''}</td>
+          </tr>
+        </table>
+
+        <h3 style="font-size: 15px; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-top: 24px;">📦 অর্ডারকৃত টুপির তালিকা (Ordered Caps)</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px;">
+          <thead>
+            <tr style="background: #f1f5f9; text-align: left;">
+              <th style="padding: 10px 12px; color: #475569;">টুপি / ডিজাইন</th>
+              <th style="padding: 10px 12px; text-align: center; color: #475569;">সাইজ</th>
+              <th style="padding: 10px 12px; text-align: center; color: #475569;">পরিমাণ</th>
+              <th style="padding: 10px 12px; text-align: right; color: #475569;">মূল্য</th>
+              <th style="padding: 10px 12px; text-align: right; color: #475569;">মোট</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsRowsHtml}
+          </tbody>
+          <tfoot>
+            <tr style="background: #f8fafc; font-weight: 700; font-size: 15px;">
+              <td colspan="4" style="padding: 12px; text-align: right; color: #0f172a;">সর্বমোট মূল্য (Grand Total):</td>
+              <td style="padding: 12px; text-align: right; color: #b45309;">৳ ${order.total}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div style="margin-top: 24px; padding: 16px; background: #ecfdf5; border-radius: 8px; border: 1px solid #a7f3d0;">
+          <p style="margin: 0; font-size: 13px; color: #065f46;">
+            ✅ <strong>পেমেন্ট স্ট্যাটাস:</strong> ${order.paymentStatus} (${order.paymentMethod})<br/>
+            📌 <strong>ট্রানজেকশন আইডি:</strong> ${order.transactionId || 'N/A'}<br/>
+            🚚 <strong>অর্ডার স্ট্যাটাস:</strong> ${order.orderStatus || 'Processing'}
+          </p>
+        </div>
+
+        <div style="text-align: center; margin-top: 28px;">
+          <p style="font-size: 12px; color: #94a3b8; margin: 0;">Al Taher Cap Garments — Factory Wholesale & Export, Dhaka, Bangladesh</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const emailText = `
+AL TAHER CAP GARMENTS - NEW ORDER ALERT
+========================================
+Order ID: ${order.id}
+Date: ${order.date || new Date().toLocaleDateString('en-GB')}
+Total Amount: ৳ ${order.total}
+Payment Method: ${order.paymentMethod} (${order.paymentStatus})
+
+CUSTOMER DETAILS:
+- Name: ${order.customerName}
+- Phone: ${order.phone}
+- Email: ${order.email || 'N/A'}
+- Address: ${order.address}, ${order.district || ''}, ${order.city || ''}
+
+ORDER ITEMS:
+${itemsText}
+
+TOTAL: ৳ ${order.total}
+========================================
+`;
+
+  try {
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = Number(process.env.SMTP_PORT) || 587;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpUser && smtpPass) {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass
+        }
+      });
+
+      const info = await transporter.sendMail({
+        from: process.env.SMTP_FROM || `"Al Taher Cap Orders" <${smtpUser}>`,
+        to: targetEmail,
+        subject: emailSubject,
+        text: emailText,
+        html: emailHtml
+      });
+
+      console.log(`[EMAIL DISPATCH SUCCESS] Real SMTP email sent for Order #${order.id} to ${targetEmail}. MessageId: ${info.messageId}`);
+      return { success: true, status: 'Sent', recipient: targetEmail };
+    } else {
+      console.log(`[ORDER EMAIL NOTIFICATION LOGGED]
+To: ${targetEmail}
+Subject: ${emailSubject}
+Customer: ${order.customerName} (${order.phone})
+Total: ৳${order.total}
+Address: ${order.address}`);
+      return { success: true, status: 'Logged / Direct Alert', recipient: targetEmail };
+    }
+  } catch (err: any) {
+    console.error('[EMAIL DISPATCH ERROR]', err);
+    return { success: false, status: 'Failed', error: err.message, recipient: targetEmail };
+  }
+}
+
+// API Route: Submit Order & Dispatch Email to abdullahalhumidy@gmail.com
+app.post('/api/orders', async (req, res) => {
+  const { customerName, phone, email, address, city, district, country, items, total, subtotal, shippingFee, paymentMethod, currency } = req.body;
   if (!customerName || !phone || !address) {
     return res.status(400).json({ error: 'Customer name, phone, and delivery address are required.' });
   }
@@ -527,23 +697,145 @@ app.post('/api/orders', (req, res) => {
     city: city || 'Dhaka',
     district: district || 'Dhaka',
     country: country || 'Bangladesh',
-    items,
+    items: items || [],
+    subtotal: subtotal || total,
+    shippingFee: shippingFee || 0,
     total,
     currency: currency || 'BDT',
-    paymentMethod,
+    paymentMethod: paymentMethod || 'Cash on Delivery (COD)',
     paymentStatus: paymentMethod === 'Cash on Delivery (COD)' ? 'Pending' : 'Paid',
     orderStatus: 'Processing',
-    transactionId: 'TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase()
+    transactionId: 'TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+    emailRecipient: process.env.ADMIN_NOTIFICATION_EMAIL || 'abdullahalhumidy@gmail.com',
+    emailNotificationStatus: 'Processing'
   };
+
+  // Dispatch Email Notification
+  try {
+    const emailResult = await sendOrderNotificationEmail(newOrder);
+    newOrder.emailNotificationStatus = (emailResult.status as any) || 'Sent';
+  } catch (emailErr) {
+    console.error('Email dispatch error on order creation:', emailErr);
+    newOrder.emailNotificationStatus = 'Logged / Direct Alert';
+  }
 
   ordersDatabase.unshift(newOrder);
   saveOrders(ordersDatabase);
-  return res.json({ success: true, order: newOrder });
+
+  return res.json({ 
+    success: true, 
+    order: newOrder,
+    emailStatus: newOrder.emailNotificationStatus,
+    adminEmail: newOrder.emailRecipient 
+  });
 });
 
 // API Route: Get Orders (Admin)
 app.get('/api/orders', (req, res) => {
   return res.json({ orders: ordersDatabase });
+});
+
+// API Route: Update Order Status (Admin)
+app.put('/api/orders/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { orderStatus, paymentStatus } = req.body;
+
+  let found = false;
+  ordersDatabase = ordersDatabase.map(ord => {
+    if (ord.id === id) {
+      found = true;
+      return {
+        ...ord,
+        orderStatus: orderStatus || ord.orderStatus,
+        paymentStatus: paymentStatus || ord.paymentStatus
+      };
+    }
+    return ord;
+  });
+
+  if (found) {
+    saveOrders(ordersDatabase);
+    return res.json({ success: true, orders: ordersDatabase });
+  }
+  return res.status(404).json({ error: 'Order not found' });
+});
+
+// API Route: Delete Order (Admin)
+app.delete('/api/orders/:id', (req, res) => {
+  const { id } = req.params;
+  ordersDatabase = ordersDatabase.filter(ord => ord.id !== id);
+  saveOrders(ordersDatabase);
+  return res.json({ success: true, orders: ordersDatabase });
+});
+
+// API Route: Admin Test Email Trigger
+app.post('/api/admin/test-email', async (req, res) => {
+  const testOrder = {
+    id: 'ATG-TEST-' + Math.floor(1000 + Math.random() * 9000),
+    date: new Date().toLocaleDateString('en-GB'),
+    customerName: 'Al Taher Admin Tester',
+    phone: '+880 1711-234567',
+    email: 'abdullahalhumidy@gmail.com',
+    address: 'Keraniganj Wholesale Market, Dhaka',
+    city: 'Dhaka',
+    district: 'Dhaka',
+    items: [
+      {
+        product: { designNumber: 'Design #101 (Test)', category: 'Omani & Zari Series', price: 650 },
+        selectedSize: '54 cm',
+        quantity: 2
+      }
+    ],
+    total: 1300,
+    paymentMethod: 'Cash on Delivery (COD)',
+    paymentStatus: 'Pending',
+    orderStatus: 'Processing',
+    transactionId: 'TXN-TEST-1234'
+  };
+
+  const result = await sendOrderNotificationEmail(testOrder);
+  return res.json({ 
+    success: true, 
+    result,
+    recipient: process.env.ADMIN_NOTIFICATION_EMAIL || 'abdullahalhumidy@gmail.com',
+    message: `Test email notification dispatched to ${process.env.ADMIN_NOTIFICATION_EMAIL || 'abdullahalhumidy@gmail.com'}`
+  });
+});
+
+// Dynamic SEO Sitemap endpoint for search engines
+app.get('/sitemap.xml', (req, res) => {
+  res.header('Content-Type', 'application/xml');
+  const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://altahercap.com/</loc>
+    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://altahercap.com/?lang=bn" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://altahercap.com/?lang=en" />
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?q=80&amp;w=1200&amp;auto=format&amp;fit=crop</image:loc>
+      <image:title>Taher Cap &amp; Al Taher Cap Garments - Premium Namaz Topi Wholesale Bangladesh</image:title>
+      <image:caption>Authentic Taher Cap and Namaz Topi manufacturer and wholesale supplier in Bangladesh</image:caption>
+    </image:image>
+  </url>
+</urlset>`;
+  res.send(sitemapXml);
+});
+
+// SEO Robots.txt endpoint
+app.get('/robots.txt', (req, res) => {
+  res.header('Content-Type', 'text/plain');
+  res.send(`User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://altahercap.com/sitemap.xml
+`);
 });
 
 async function startServer() {

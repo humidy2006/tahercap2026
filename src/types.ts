@@ -77,6 +77,8 @@ export interface Order {
   paymentStatus: 'Pending' | 'Paid';
   orderStatus: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
   transactionId?: string;
+  emailNotificationStatus?: 'Sent' | 'Logged / Direct Alert' | 'Failed';
+  emailRecipient?: string;
 }
 
 export interface Review {

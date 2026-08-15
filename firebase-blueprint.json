@@ -28,6 +28,24 @@
         "quantity": { "type": "string" },
         "createdAt": { "type": "string" }
       }
+    },
+    "orders": {
+      "title": "Customer Orders",
+      "description": "Customer purchase orders with items, contact details, total amount and fulfillment status",
+      "fields": {
+        "customerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "district": { "type": "string" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "orderStatus": { "type": "string" },
+        "date": { "type": "string" },
+        "items": { "type": "array" }
+      }
     }
   }
 }
