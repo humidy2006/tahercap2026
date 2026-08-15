@@ -126,9 +126,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               } catch {
                 compressed = canvas.toDataURL('image/jpeg', 0.80);
               }
-              resolve(compressed || rawDataUrl);
+              const finalData = compressed || rawDataUrl;
+
+              // Upload immediately to backend server for ultra-lightweight URL & durable file persistence
+              fetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: finalData })
+              })
+                .then((res) => res.json())
+                .then((data) => {
+                  if (data && data.url) {
+                    resolve(data.url);
+                  } else {
+                    resolve(finalData);
+                  }
+                })
+                .catch(() => {
+                  resolve(finalData);
+                });
             } else {
-              resolve(rawDataUrl);
+              // Upload raw if canvas failed
+              fetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: rawDataUrl })
+              })
+                .then((res) => res.json())
+                .then((data) => {
+                  if (data && data.url) {
+                    resolve(data.url);
+                  } else {
+                    resolve(rawDataUrl);
+                  }
+                })
+                .catch(() => resolve(rawDataUrl));
             }
           } catch {
             resolve(rawDataUrl);
@@ -428,6 +460,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const sampleImages = [
+    { label: 'Omani Diamond Cap', url: IMAGES.omaniDiamond },
+    { label: 'Royal Velvet Circular', url: IMAGES.velvetCircular },
     { label: 'Omani Zari Cap', url: IMAGES.omaniTupi },
     { label: 'Royal Velvet Cap', url: IMAGES.velvetTupi },
     { label: 'Cotton Net Cap', url: IMAGES.cottonTupi },

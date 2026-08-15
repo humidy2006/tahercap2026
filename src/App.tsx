@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Product, CartItem, CustomTupiDesign, Language, Currency, Order, User } from './types';
 import { INITIAL_PRODUCTS } from './data/products';
 import { db, doc, onSnapshot, setDoc, getDoc } from './lib/firebase';
@@ -29,6 +29,7 @@ export default function App() {
   // Products Database State with Cloud Firestore & Server Sync
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
+  const localCatalogTimestamp = useRef<number>(Date.now());
 
   // 1. Primary Live Sync: Cloud Firestore Real-Time Listener (Instant all-device & all-user sync)
   useEffect(() => {
@@ -40,7 +41,14 @@ export default function App() {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data && Array.isArray(data.items)) {
+          if (data && Array.isArray(data.items) && data.items.length > 0) {
+            // Guard against stale Firestore snapshot overwriting newer local admin updates
+            if (data.updatedAt && data.updatedAt < localCatalogTimestamp.current) {
+              return;
+            }
+            if (data.updatedAt) {
+              localCatalogTimestamp.current = data.updatedAt;
+            }
             setProducts(data.items);
             localStorage.setItem('altaher_products', JSON.stringify(data.items));
             setIsCloudSynced(true);
@@ -179,6 +187,8 @@ export default function App() {
 
   // 4. Save products to Cloud Firestore, LocalStorage & Server (Syncs universally across all environments)
   const saveAndSyncProducts = async (rawProducts: Product[]) => {
+    const timestamp = Date.now();
+    localCatalogTimestamp.current = timestamp;
     const newProducts = sanitizeProducts(rawProducts);
     setProducts(newProducts);
     try {
@@ -187,28 +197,38 @@ export default function App() {
       console.error('Failed to save products to localStorage:', e);
     }
 
-    // 1) Write to Cloud Firestore (Instant propagation to all users on any link/device)
+    let finalSanitizedProducts = newProducts;
+
+    // 1) Write to Express API backend first (automatically saves base64 images as server files and returns clean URLs)
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products: newProducts, updatedAt: timestamp })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.products)) {
+          finalSanitizedProducts = data.products;
+          setProducts(finalSanitizedProducts);
+          localStorage.setItem('altaher_products', JSON.stringify(finalSanitizedProducts));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to sync products with backend server:', e);
+    }
+
+    // 2) Write to Cloud Firestore with lightweight sanitized product list & timestamp
     try {
       const catalogDocRef = doc(db, 'catalog', 'main_products');
       await setDoc(catalogDocRef, {
-        items: newProducts,
-        updatedAt: Date.now(),
+        items: finalSanitizedProducts,
+        updatedAt: timestamp,
         updatedBy: currentUser?.email || 'admin@altahercap.com'
       });
       setIsCloudSynced(true);
     } catch (err) {
       console.error('Failed to update Firestore database:', err);
-    }
-
-    // 2) Write to Express API backend
-    try {
-      await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products: newProducts })
-      });
-    } catch (e) {
-      console.error('Failed to sync products with backend server:', e);
     }
   };
 

@@ -4,6 +4,8 @@ import velvetTupiImage from '../assets/images/velvet_royal_tupi_1786563844032.jp
 import cottonTupiImage from '../assets/images/cotton_soft_tupi_1786563854226.jpg';
 import factoryImage from '../assets/images/factory_craftsmanship_1786563864156.jpg';
 import companyLogoImage from '../assets/images/company_logo_1786611354040.jpg';
+import omaniDiamondImage from '../assets/images/omani_diamond_caps_1786779100491.jpg';
+import velvetCircularImage from '../assets/images/velvet_circular_caps_1786779122288.jpg';
 
 export const IMAGES = {
   companyLogo: companyLogoImage,
@@ -12,6 +14,8 @@ export const IMAGES = {
   velvetTupi: velvetTupiImage,
   cottonTupi: cottonTupiImage,
   factory: factoryImage,
+  omaniDiamond: omaniDiamondImage,
+  velvetCircular: velvetCircularImage,
   // Additional high quality curated images for product options
   turkishCap: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=800&q=80',
   pakistaniTupi: 'https://images.unsplash.com/photo-1596451190630-186aff535bf2?auto=format&fit=crop&w=800&q=80',

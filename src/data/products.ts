@@ -38,6 +38,68 @@ export const INITIAL_PRODUCTS: Product[] = [
     ],
   },
   {
+    id: 'atg-201',
+    category: 'Omani & Zari Series',
+    categoryBn: 'ওমানি ও জারি সিরিজ',
+    designNumber: 'Design #201',
+    price: 720,
+    originalPrice: 920,
+    quantity: '1 Pc',
+    sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm', '58 cm'],
+    isFeatured: true,
+    image: IMAGES.omaniDiamond,
+    images: [
+      IMAGES.omaniDiamond,
+      IMAGES.omaniTupi
+    ],
+  },
+  {
+    id: 'atg-202',
+    category: 'Omani & Zari Series',
+    categoryBn: 'ওমানি ও জারি সিরিজ',
+    designNumber: 'Design #202',
+    price: 680,
+    originalPrice: 880,
+    quantity: '1 Pc',
+    sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm', '58 cm'],
+    isFeatured: true,
+    image: IMAGES.omaniDiamond,
+    images: [
+      IMAGES.omaniDiamond
+    ],
+  },
+  {
+    id: 'atg-301',
+    category: 'Royal Velvet',
+    categoryBn: 'রয়েল ভেলভেট',
+    designNumber: 'Design #301',
+    price: 980,
+    originalPrice: 1250,
+    quantity: '1 Pc',
+    sizes: ['50 cm', '52 cm', '54 cm', '56 cm'],
+    isFeatured: true,
+    image: IMAGES.velvetCircular,
+    images: [
+      IMAGES.velvetCircular,
+      IMAGES.velvetTupi
+    ],
+  },
+  {
+    id: 'atg-302',
+    category: 'Royal Velvet',
+    categoryBn: 'রয়েল ভেলভেট',
+    designNumber: 'Design #302',
+    price: 950,
+    originalPrice: 1200,
+    quantity: '1 Pc',
+    sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm'],
+    isFeatured: true,
+    image: IMAGES.velvetCircular,
+    images: [
+      IMAGES.velvetCircular
+    ],
+  },
+  {
     id: 'atg-003',
     category: 'Daily Comfort',
     categoryBn: 'দৈনন্দিন আরামদায়ক',

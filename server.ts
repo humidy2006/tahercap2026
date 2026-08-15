@@ -24,11 +24,67 @@ if (!fs.existsSync(DB_DIR)) {
   }
 }
 
+const UPLOADS_DIR = path.join(DB_DIR, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  try {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  } catch (err) {
+    console.error('Failed to create uploads directory:', err);
+  }
+}
+
+// Serve uploaded images directly with caching headers
+app.use('/uploads', express.static(UPLOADS_DIR, {
+  maxAge: '7d',
+  immutable: true
+}));
+
+// Helper to convert base64 image data into ultra-lightweight server files
+function saveBase64Image(dataUri: string): string {
+  if (!dataUri || typeof dataUri !== 'string') return dataUri;
+  if (dataUri.startsWith('data:image/')) {
+    try {
+      const matches = dataUri.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+      if (matches) {
+        let ext = matches[1].toLowerCase();
+        if (ext === 'jpeg') ext = 'jpg';
+        if (ext.includes('svg')) ext = 'svg';
+        if (ext === 'x-icon') ext = 'ico';
+        const base64Data = matches[2];
+        const fileName = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+        const filePath = path.join(UPLOADS_DIR, fileName);
+        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+        return `/uploads/${fileName}`;
+      }
+    } catch (e) {
+      console.error('Error converting base64 image to server file:', e);
+    }
+  }
+  return dataUri;
+}
+
+// Clean product image arrays from heavy base64 to lightweight URLs
+function sanitizeProductImages(product: any): any {
+  if (!product) return product;
+  const cleanedImage = saveBase64Image(product.image);
+  let cleanedImages: string[] = [];
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    cleanedImages = product.images.map((img: string) => saveBase64Image(img)).filter(Boolean);
+  } else if (cleanedImage) {
+    cleanedImages = [cleanedImage];
+  }
+  return {
+    ...product,
+    image: cleanedImage || (cleanedImages[0] || ''),
+    images: cleanedImages
+  };
+}
+
 const PRODUCTS_FILE = path.join(DB_DIR, 'products.json');
 const ORDERS_FILE = path.join(DB_DIR, 'orders.json');
 const INQUIRIES_FILE = path.join(DB_DIR, 'inquiries.json');
 
-// Default initial catalog
+// Default initial catalog including user photo models
 const DEFAULT_PRODUCTS = [
   {
     id: 'atg-001',
@@ -63,6 +119,67 @@ const DEFAULT_PRODUCTS = [
       'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=600&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?q=80&w=600&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1596451190630-186aff535bf2?auto=format&fit=crop&w=800&q=80'
+    ]
+  },
+  {
+    id: 'atg-201',
+    category: 'Omani & Zari Series',
+    categoryBn: 'ওমানি ও জারি সিরিজ',
+    designNumber: 'Design #201',
+    price: 720,
+    originalPrice: 920,
+    quantity: '1 Pc',
+    sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm', '58 cm'],
+    isFeatured: true,
+    image: 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?q=80&w=600&auto=format&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=600&auto=format&fit=crop'
+    ]
+  },
+  {
+    id: 'atg-202',
+    category: 'Omani & Zari Series',
+    categoryBn: 'ওমানি ও জারি সিরিজ',
+    designNumber: 'Design #202',
+    price: 680,
+    originalPrice: 880,
+    quantity: '1 Pc',
+    sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm', '58 cm'],
+    isFeatured: true,
+    image: 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?q=80&w=600&auto=format&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?q=80&w=600&auto=format&fit=crop'
+    ]
+  },
+  {
+    id: 'atg-301',
+    category: 'Royal Velvet',
+    categoryBn: 'রয়েল ভেলভেট',
+    designNumber: 'Design #301',
+    price: 980,
+    originalPrice: 1250,
+    quantity: '1 Pc',
+    sizes: ['50 cm', '52 cm', '54 cm', '56 cm'],
+    isFeatured: true,
+    image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=600&auto=format&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=600&auto=format&fit=crop'
+    ]
+  },
+  {
+    id: 'atg-302',
+    category: 'Royal Velvet',
+    categoryBn: 'রয়েল ভেলভেট',
+    designNumber: 'Design #302',
+    price: 950,
+    originalPrice: 1200,
+    quantity: '1 Pc',
+    sizes: ['48 cm', '50 cm', '52 cm', '54 cm', '56 cm'],
+    isFeatured: true,
+    image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=600&auto=format&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=600&auto=format&fit=crop'
     ]
   },
   {
@@ -187,7 +304,8 @@ function loadProducts(): any[] {
 
 function saveProducts(products: any[]) {
   try {
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
+    const sanitized = Array.isArray(products) ? products.map(sanitizeProductImages) : [];
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(sanitized, null, 2), 'utf-8');
   } catch (err) {
     console.error('Error saving products to file:', err);
   }
@@ -368,11 +486,26 @@ app.get('/api/products/stream', (req, res) => {
   });
 });
 
+// API Route: Direct Image Upload (Converts base64 to lightweight server URL)
+app.post('/api/upload', (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+    const savedUrl = saveBase64Image(image);
+    return res.json({ success: true, url: savedUrl });
+  } catch (err) {
+    console.error('Error handling /api/upload:', err);
+    return res.status(500).json({ error: 'Failed to upload image' });
+  }
+});
+
 // API Route: Update Entire Products Array (Admin Batch Sync - persists for all users on all devices)
 app.post('/api/products', (req, res) => {
   const { products } = req.body;
   if (Array.isArray(products)) {
-    productsDatabase = products;
+    productsDatabase = products.map(sanitizeProductImages);
     saveProducts(productsDatabase);
     broadcastProductsUpdate();
     return res.json({ 
@@ -392,15 +525,16 @@ app.post('/api/products/add', (req, res) => {
     return res.status(400).json({ error: 'Valid product object is required.' });
   }
   
-  const existingIdx = productsDatabase.findIndex(p => p.id === newProduct.id);
+  const sanitized = sanitizeProductImages(newProduct);
+  const existingIdx = productsDatabase.findIndex(p => p.id === sanitized.id);
   if (existingIdx >= 0) {
-    productsDatabase[existingIdx] = newProduct;
+    productsDatabase[existingIdx] = sanitized;
   } else {
-    productsDatabase = [newProduct, ...productsDatabase];
+    productsDatabase = [sanitized, ...productsDatabase];
   }
   saveProducts(productsDatabase);
   broadcastProductsUpdate();
-  return res.json({ success: true, products: productsDatabase, product: newProduct });
+  return res.json({ success: true, products: productsDatabase, product: sanitized });
 });
 
 // API Route: Update Single Product by ID
@@ -408,7 +542,8 @@ app.put('/api/products/:id', (req, res) => {
   const { id } = req.params;
   const updatedData = req.body;
   
-  productsDatabase = productsDatabase.map(p => (p.id === id ? { ...p, ...updatedData } : p));
+  const sanitized = sanitizeProductImages({ id, ...updatedData });
+  productsDatabase = productsDatabase.map(p => (p.id === id ? { ...p, ...sanitized } : p));
   saveProducts(productsDatabase);
   broadcastProductsUpdate();
   return res.json({ success: true, products: productsDatabase });
