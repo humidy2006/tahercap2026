@@ -1,7 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Products catalog: readable and writable by everyone (so all users get real-time product updates)
+    // Individual products collection
+    match /products/{productId} {
+      allow read, write: if true;
+    }
+
+    // Products catalog: readable and writable by everyone
     match /catalog/{document=**} {
       allow read, write: if true;
     }

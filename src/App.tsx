@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Product, CartItem, CustomTupiDesign, Language, Currency, Order, User } from './types';
 import { INITIAL_PRODUCTS } from './data/products';
-import { db, doc, onSnapshot, setDoc, getDoc } from './lib/firebase';
+import { db, doc, onSnapshot, setDoc, getDoc, collection, deleteDoc } from './lib/firebase';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { ProductCatalog } from './components/ProductCatalog';
@@ -31,43 +31,68 @@ export default function App() {
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
   const localCatalogTimestamp = useRef<number>(Date.now());
 
-  // 1. Primary Live Sync: Cloud Firestore Real-Time Listener (Instant all-device & all-user sync)
+  // 1. Primary Live Sync: Cloud Firestore Real-Time Listener (Collection listener + Catalog fallback)
   useEffect(() => {
-    const catalogDocRef = doc(db, 'catalog', 'main_products');
+    // 1. Listen to individual documents in 'products' collection (immune to 1MB document limit)
+    const unsubCollection = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: Product[] = [];
+          snapshot.forEach((d) => {
+            const item = d.data() as Product;
+            if (item && item.id && item.designNumber) {
+              list.push(item);
+            }
+          });
+          if (list.length > 0) {
+            // Keep clean ordering
+            list.sort((a, b) => {
+              const aTime = (a as any).updatedAt || (a.id.startsWith('atg-') ? Number(a.id.replace('atg-', '')) || 0 : 0);
+              const bTime = (b as any).updatedAt || (b.id.startsWith('atg-') ? Number(b.id.replace('atg-', '')) || 0 : 0);
+              return bTime - aTime;
+            });
+            setProducts(list);
+            localStorage.setItem('altaher_products', JSON.stringify(list));
+            setIsCloudSynced(true);
+          }
+        }
+      },
+      (err) => {
+        console.warn('Products collection listener error:', err);
+      }
+    );
 
-    // Subscribe to real-time changes from Firestore
-    const unsubscribe = onSnapshot(
+    // 2. Also listen to catalog doc as fallback
+    const catalogDocRef = doc(db, 'catalog', 'main_products');
+    const unsubDoc = onSnapshot(
       catalogDocRef,
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data && Array.isArray(data.items) && data.items.length > 0) {
-            // Guard against stale Firestore snapshot overwriting newer local admin updates
             if (data.updatedAt && data.updatedAt < localCatalogTimestamp.current) {
               return;
             }
             if (data.updatedAt) {
               localCatalogTimestamp.current = data.updatedAt;
             }
-            setProducts(data.items);
+            setProducts((prev) => {
+              if (prev.length > data.items.length) return prev;
+              return data.items;
+            });
             localStorage.setItem('altaher_products', JSON.stringify(data.items));
             setIsCloudSynced(true);
           }
-        } else {
-          // If Firestore is empty initially, seed it with INITIAL_PRODUCTS
-          setDoc(catalogDocRef, {
-            items: INITIAL_PRODUCTS,
-            updatedAt: Date.now(),
-            seeded: true
-          }).catch(err => console.error('Error seeding Firestore catalog:', err));
         }
       },
-      (error) => {
-        console.error('Firestore listener error, falling back to REST/SSE:', error);
-      }
+      (err) => console.warn('Catalog doc listener error:', err)
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubCollection();
+      unsubDoc();
+    };
   }, []);
 
   // Function to fetch latest products from server with cache-busting (fallback if offline)
@@ -218,14 +243,22 @@ export default function App() {
       console.error('Failed to sync products with backend server:', e);
     }
 
-    // 2) Write to Cloud Firestore with lightweight sanitized product list & timestamp
+    // 2) Write to Cloud Firestore: individual documents in 'products' collection (completely immune to 1MB limit) & catalog fallback
     try {
+      for (const prod of finalSanitizedProducts) {
+        setDoc(doc(db, 'products', prod.id), {
+          ...prod,
+          updatedAt: timestamp
+        }).catch((e) => console.warn('Product document save:', e));
+      }
+
       const catalogDocRef = doc(db, 'catalog', 'main_products');
       await setDoc(catalogDocRef, {
         items: finalSanitizedProducts,
         updatedAt: timestamp,
         updatedBy: currentUser?.email || 'admin@altahercap.com'
-      });
+      }).catch((e) => console.warn('Catalog doc save:', e));
+
       setIsCloudSynced(true);
     } catch (err) {
       console.error('Failed to update Firestore database:', err);
@@ -394,6 +427,14 @@ export default function App() {
     }
 
     setCartItems(prev => prev.filter(item => item.product.id !== productId));
+    
+    // Delete individual product document from Firestore
+    try {
+      deleteDoc(doc(db, 'products', productId)).catch(() => {});
+    } catch (e) {
+      console.warn('Error deleting doc from Firestore:', e);
+    }
+
     await saveAndSyncProducts(updated);
   };
 

@@ -1,9 +1,30 @@
 {
   "entities": {
+    "products": {
+      "title": "Products",
+      "description": "Individual prayer cap items with design details, pricing, sizes, and optimized photo URLs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "categoryBn": { "type": "string" },
+        "designNumber": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "quantity": { "type": "string" },
+        "sizes": { "type": "array" },
+        "image": { "type": "string" },
+        "images": { "type": "array" },
+        "isFeatured": { "type": "boolean" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "designNumber", "price", "image"]
+    },
     "productsCatalog": {
       "title": "Products Catalog",
       "description": "Global prayer cap inventory synced in real-time across all users and devices",
-      "fields": {
+      "type": "object",
+      "properties": {
         "items": {
           "type": "array",
           "description": "List of all product items"

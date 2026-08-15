@@ -44,13 +44,17 @@ function saveBase64Image(dataUri: string): string {
   if (!dataUri || typeof dataUri !== 'string') return dataUri;
   if (dataUri.startsWith('data:image/')) {
     try {
-      const matches = dataUri.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
-      if (matches) {
-        let ext = matches[1].toLowerCase();
-        if (ext === 'jpeg') ext = 'jpg';
+      const base64Index = dataUri.indexOf(';base64,');
+      if (base64Index !== -1) {
+        const mime = dataUri.substring(5, base64Index).toLowerCase();
+        let ext = mime.split('/')[1] || 'jpg';
+        if (ext.includes('jpeg')) ext = 'jpg';
+        if (ext.includes('webp')) ext = 'webp';
+        if (ext.includes('png')) ext = 'png';
         if (ext.includes('svg')) ext = 'svg';
-        if (ext === 'x-icon') ext = 'ico';
-        const base64Data = matches[2];
+        if (ext.includes('icon')) ext = 'ico';
+        
+        const base64Data = dataUri.substring(base64Index + 8).trim();
         const fileName = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
         const filePath = path.join(UPLOADS_DIR, fileName);
         fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
